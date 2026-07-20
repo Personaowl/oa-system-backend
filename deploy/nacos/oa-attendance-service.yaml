@@ -1,0 +1,6 @@
+oa:
+  attendance:
+    work-start: "09:00"
+    late-threshold-minutes: 5
+    lock-ttl-seconds: 10
+

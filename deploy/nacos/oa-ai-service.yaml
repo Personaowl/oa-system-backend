@@ -1,0 +1,6 @@
+spring:
+  ai:
+    vectorstore:
+      redis:
+        index-name: oa-knowledge-index
+        prefix: 'oa:knowledge:'

@@ -1,0 +1,6 @@
+oa:
+  gateway:
+    security:
+      public-paths:
+        - /api/v1/auth/login
+        - /actuator/health/**

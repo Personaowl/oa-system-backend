@@ -1,0 +1,62 @@
+# OA System Backend
+
+Spring Boot 3.5 / Spring Cloud Alibaba microservice backend for the JavaEE course project.
+
+## Modules
+
+| Module | Port | Responsibility |
+| --- | ---: | --- |
+| `oa-gateway` | 8080 | Routing, trace ID, JWT authentication |
+| `oa-user-service` | 8101 | Login, organization, employee and RBAC |
+| `oa-attendance-service` | 8102 | Check-in/out and attendance records |
+| `oa-flow-service` | 8103 | Leave/overtime requests and approval tasks |
+| `oa-notice-service` | 8104 | Notices and read state |
+| `oa-ai-service` | 8105 | Spring AI, Ollama and Redis vector search |
+
+Shared libraries are under `oa-common`. Business modules may depend on common modules; common modules must never depend on business modules.
+
+## Prerequisites
+
+- JDK 21
+- Maven 3.9+
+- MySQL 8
+- Nacos 3.2.2 (`127.0.0.1:8848`)
+- Redis 8 (`127.0.0.1:6379`)
+- Elasticsearch 8.18.1 (`127.0.0.1:9200`)
+- Ollama (`127.0.0.1:12434`) for the AI service
+
+The infrastructure Compose file lives at `D:\oa-system\ops\compose.yaml` in the team workspace.
+
+## Build
+
+```powershell
+mvn clean verify
+```
+
+To build one service and its dependencies:
+
+```powershell
+mvn -pl oa-user-service -am clean verify
+```
+
+## Run locally
+
+1. Copy `.env.example` values into your IDE environment or terminal.
+2. Create the database with `sql/00-create-database.sql`.
+3. Start infrastructure and verify Nacos, Redis and Elasticsearch.
+4. Start the services, then start the gateway last.
+
+Example:
+
+```powershell
+mvn -pl oa-user-service spring-boot:run
+```
+
+All Nacos imports are optional so a module can still be compiled and unit-tested without Nacos. Business database calls require valid local database credentials.
+
+## First integration checkpoint
+
+The first team milestone is a login request flowing through Gateway to `oa-user-service`, returning a signed JWT, followed by an authenticated request to `/api/v1/users/me`.
+
+See [docs/architecture.md](docs/architecture.md) and [docs/contributing.md](docs/contributing.md).
+
