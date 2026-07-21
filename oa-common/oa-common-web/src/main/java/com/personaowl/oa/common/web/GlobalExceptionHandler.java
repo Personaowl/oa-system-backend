@@ -23,7 +23,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException exception) {
-        return ResponseEntity.badRequest().body(ApiResponse.failure(
+        HttpStatus status = switch (exception.errorCode()) {
+            case INVALID_CREDENTIALS, TOKEN_EXPIRED, UNAUTHORIZED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            default -> HttpStatus.BAD_REQUEST;
+        };
+        return ResponseEntity.status(status).body(ApiResponse.failure(
                 exception.errorCode().code(), exception.getMessage(), traceId()));
     }
 
@@ -57,4 +62,3 @@ public class GlobalExceptionHandler {
         return MDC.get("traceId");
     }
 }
-
