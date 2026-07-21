@@ -30,9 +30,17 @@ VALUES
     (2, 0, 'attendance:read', '查看考勤', 'BUTTON', NULL, 0),
     (3, 0, 'flow:read', '查看审批', 'BUTTON', NULL, 0),
     (4, 0, 'notice:read', '查看公告', 'BUTTON', NULL, 0),
-    (5, 0, 'system:admin', '系统管理', 'BUTTON', NULL, 0)
+    (5, 0, 'system:admin', '系统管理', 'BUTTON', NULL, 0),
+    (6, 0, 'notice:create', '创建公告', 'BUTTON', NULL, 0),
+    (7, 0, 'notice:update', '修改公告', 'BUTTON', NULL, 0),
+    (8, 0, 'notice:delete', '删除公告', 'BUTTON', NULL, 0),
+    (9, 0, 'notice:publish', '发布公告', 'BUTTON', NULL, 0),
+    (10, 0, 'notice:offline', '下线公告', 'BUTTON', NULL, 0),
+    (11, 0, 'notice:list', '公告列表', 'BUTTON', NULL, 0),
+    (12, 0, 'notice:view', '公告详情', 'BUTTON', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (1, 1), (1, 2), (1, 3), (1, 4), (1, 5);
+VALUES (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
+       (1, 8), (1, 9), (1, 10), (1, 11), (1, 12);
