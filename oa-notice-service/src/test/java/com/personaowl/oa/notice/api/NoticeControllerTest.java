@@ -1,6 +1,6 @@
 package com.personaowl.oa.notice.api;
 
-import com.personaowl.oa.common.web.GlobalExceptionHandler;
+import com.personaowl.oa.common.web.CommonWebAutoConfiguration;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
 import com.personaowl.oa.notice.domain.entity.Notice;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(NoticeController.class)
-@Import(GlobalExceptionHandler.class)
+@Import(CommonWebAutoConfiguration.class)
 class NoticeControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -42,7 +42,7 @@ class NoticeControllerTest {
     @Test
     void createShouldReturnSuccess() throws Exception {
         Notice notice = new Notice();
-        notice.setId(1L);
+        notice.setId(2079489406225780737L);
         notice.setTitle("公告标题");
         notice.setStatus(NoticeStatus.DRAFT.name());
         when(noticeService.create(any(NoticeCreateRequest.class), eq(100L))).thenReturn(notice);
@@ -56,6 +56,7 @@ class NoticeControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value("2079489406225780737"))
                 .andExpect(jsonPath("$.data.title").value("公告标题"));
     }
 
