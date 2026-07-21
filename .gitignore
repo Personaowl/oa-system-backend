@@ -1,9 +1,24 @@
-<<<<<<< HEAD
 # Compiled class file
 *.class
 
-# Log file
+# Build output
+target/
+
+# IDE settings
+*.iml
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# Environment files
+.env
+
+# Log files
 *.log
+logs/
 
 # BlueJ files
 *.ctxt
@@ -11,7 +26,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -20,20 +35,12 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Local data
+data/
+
+# Maven wrapper jar should stay tracked
+!.mvn/wrapper/maven-wrapper.jar
+
+# Virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
-=======
-target/
-*.iml
-.idea/
-.vscode/
-.classpath
-.project
-.settings/
-.factorypath
-.env
-*.log
-logs/
-data/
-!.mvn/wrapper/maven-wrapper.jar
