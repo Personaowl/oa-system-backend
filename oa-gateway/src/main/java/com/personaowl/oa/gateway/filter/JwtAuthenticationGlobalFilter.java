@@ -13,6 +13,7 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -45,7 +46,8 @@ public class JwtAuthenticationGlobalFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if (properties.getPublicPaths().stream().anyMatch(pattern -> pathMatcher.match(pattern, path))) {
+        boolean isPreflight = exchange.getRequest().getMethod() == HttpMethod.OPTIONS;
+        if (isPreflight || properties.getPublicPaths().stream().anyMatch(pattern -> pathMatcher.match(pattern, path))) {
             return chain.filter(clearIdentityHeaders(exchange));
         }
 

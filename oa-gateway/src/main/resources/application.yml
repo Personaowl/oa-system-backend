@@ -12,12 +12,12 @@ spring:
     nacos:
       discovery:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
-        username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
       config:
         server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
-        username: ${NACOS_USERNAME:nacos}
-        password: ${NACOS_PASSWORD:nacos}
+        username: ${NACOS_USERNAME:}
+        password: ${NACOS_PASSWORD:}
     gateway:
       server:
         webflux:
@@ -50,6 +50,10 @@ oa:
       secret: ${OA_JWT_SECRET:b2Etc3lzdGVtLWRldmVsb3BtZW50LW9ubHktc2VjcmV0LWtleS0yMDI2}
       access-token-ttl: 2h
   gateway:
+    cors:
+      allowed-origins:
+        - ${FRONTEND_ORIGIN:http://localhost:5173}
+        - http://127.0.0.1:5173
     security:
       public-paths:
         - /api/v1/auth/login
