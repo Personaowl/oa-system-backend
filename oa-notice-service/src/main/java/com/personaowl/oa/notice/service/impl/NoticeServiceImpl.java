@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -135,14 +134,14 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     public NoticePageVO<NoticeListItemVO> listPublished(NoticeQueryRequest request, Long currentUserId) {
-        List<Notice> notices = queryNotices(request, true);
-        return new NoticePageVO<>(notices.size(), toListItems(notices, currentUserId));
+        NoticeQueryResult result = queryNotices(request, true);
+        return new NoticePageVO<>(result.total(), toListItems(result.records(), currentUserId));
     }
 
     @Override
     public NoticePageVO<NoticeListItemVO> listAdmin(NoticeQueryRequest request, Long currentUserId) {
-        List<Notice> notices = queryNotices(request, false);
-        return new NoticePageVO<>(notices.size(), toListItems(notices, currentUserId));
+        NoticeQueryResult result = queryNotices(request, false);
+        return new NoticePageVO<>(result.total(), toListItems(result.records(), currentUserId));
     }
 
     @Override
@@ -172,7 +171,7 @@ public class NoticeServiceImpl implements NoticeService {
         return new NoticeUnreadCountVO(noticeReadMapper.countUnreadByUser(currentUserId));
     }
 
-    private List<Notice> queryNotices(NoticeQueryRequest request, boolean publishedOnly) {
+    private NoticeQueryResult queryNotices(NoticeQueryRequest request, boolean publishedOnly) {
         if (request == null) {
             request = new NoticeQueryRequest();
         }
@@ -180,22 +179,22 @@ public class NoticeServiceImpl implements NoticeService {
                 .eq(Notice::getDeleted, 0)
                 .like(request.getKeyword() != null && !request.getKeyword().isBlank(), Notice::getTitle, request.getKeyword())
                 .eq(request.getStatus() != null && !request.getStatus().isBlank(), Notice::getStatus, request.getStatus())
-                .eq(request.getTopFlag() != null, Notice::getTopFlag, request.getTopFlag())
-                .orderByDesc(Notice::getTopFlag)
-                .orderByDesc(Notice::getPublishedAt)
-                .orderByDesc(Notice::getUpdatedAt);
+                .eq(request.getTopFlag() != null, Notice::getTopFlag, request.getTopFlag());
         if (publishedOnly) {
             wrapper.eq(Notice::getStatus, NoticeStatus.PUBLISHED.name());
         }
         int page = Math.max(1, request.getPage() == null ? 1 : request.getPage());
-        int size = Math.max(1, request.getSize() == null ? 20 : request.getSize());
-        List<Notice> all = noticeMapper.selectList(wrapper);
-        int fromIndex = Math.min((page - 1) * size, all.size());
-        int toIndex = Math.min(fromIndex + size, all.size());
-        if (fromIndex >= toIndex) {
-            return Collections.emptyList();
+        int size = Math.min(100, Math.max(1, request.getSize() == null ? 20 : request.getSize()));
+        long total = noticeMapper.selectCount(wrapper);
+        if (total == 0) {
+            return new NoticeQueryResult(0, List.of());
         }
-        return all.subList(fromIndex, toIndex);
+        long offset = (long) (page - 1) * size;
+        wrapper.orderByDesc(Notice::getTopFlag)
+                .orderByDesc(Notice::getPublishedAt)
+                .orderByDesc(Notice::getUpdatedAt)
+                .last("LIMIT " + offset + ", " + size);
+        return new NoticeQueryResult(total, noticeMapper.selectList(wrapper));
     }
 
     private List<NoticeListItemVO> toListItems(List<Notice> notices, Long currentUserId) {
@@ -248,5 +247,8 @@ public class NoticeServiceImpl implements NoticeService {
         vo.setViewCount(notice.getViewCount());
         vo.setRead(currentUserId != null && noticeReadMapper.existsByNoticeIdAndUserId(notice.getId(), currentUserId));
         return vo;
+    }
+
+    private record NoticeQueryResult(long total, List<Notice> records) {
     }
 }

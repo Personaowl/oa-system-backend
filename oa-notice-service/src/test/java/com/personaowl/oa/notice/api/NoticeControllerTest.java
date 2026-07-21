@@ -68,7 +68,7 @@ class NoticeControllerTest {
                         .content("""
                                 {"title":"公告标题","content":"公告内容","status":"DRAFT"}
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -80,7 +80,7 @@ class NoticeControllerTest {
                         .content("""
                                 {"title":"公告标题","content":"公告内容","status":"DRAFT"}
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("A0103"));
     }
 
@@ -104,7 +104,7 @@ class NoticeControllerTest {
         mockMvc.perform(get("/api/v1/notices")
                         .header("X-User-Id", "100")
                         .header("X-Permissions", "notice:view"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -124,7 +124,7 @@ class NoticeControllerTest {
     @Test
     void publicListWithoutUserIdShouldReturnUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/notices/public"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("A0103"));
     }
 
@@ -178,7 +178,7 @@ class NoticeControllerTest {
                         .content("""
                                 {"title":"更新后","content":"内容"}
                                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -200,7 +200,7 @@ class NoticeControllerTest {
         mockMvc.perform(delete("/api/v1/notices/1")
                         .header("X-User-Id", "100")
                         .header("X-Permissions", "notice:view"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -224,7 +224,7 @@ class NoticeControllerTest {
         mockMvc.perform(post("/api/v1/notices/1/publish")
                         .header("X-User-Id", "100")
                         .header("X-Permissions", "notice:view"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -248,7 +248,7 @@ class NoticeControllerTest {
         mockMvc.perform(post("/api/v1/notices/1/offline")
                         .header("X-User-Id", "100")
                         .header("X-Permissions", "notice:view"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 
@@ -271,7 +271,7 @@ class NoticeControllerTest {
         mockMvc.perform(get("/api/v1/notices/1")
                         .header("X-User-Id", "100")
                         .header("X-Permissions", "notice:list"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("A0201"));
     }
 }
