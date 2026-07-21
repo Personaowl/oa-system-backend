@@ -467,16 +467,48 @@ JWT 密钥、Nacos 配置和 .env 的安全管理方式。
 | 公告 | GET /api/v1/notices/public/unread-count | 未读数量 |
 | AI | POST /api/v1/ai/chat | SSE/普通响应，返回来源 |
 
-### 通知公告模块开发模板
+### 通知公告模块最终版接口文档
 | 项目 | 内容 |
 | --- | --- |
-| 模块目标 | 支持管理员发布公告、员工查看公告、记录已读状态 |
+| 模块目标 | 支持管理员发布公告、员工查看公告、记录已读状态，并在不拆分接口的前提下完成统一交付 |
 | 核心表 | `notice`、`notice_read` |
 | 状态枚举 | `DRAFT`、`PUBLISHED`、`OFFLINE` |
-| 关键约束 | 仅 `PUBLISHED` 状态对员工可见；`notice_read` 以 `notice_id + user_id` 联合主键防重复；公告支持摘要、置顶、下线时间和浏览统计 |
-| 管理端接口 | 创建、修改、删除、发布、下线、列表、详情、已读统计 |
-| 员工端接口 | 公告列表、详情、标记已读、未读数量 |
+| 数据约束 | `notice_read.notice_id + user_id` 联合主键防重复；仅 `PUBLISHED` 状态对员工可见；公告支持摘要、置顶、下线时间、浏览统计与逻辑删除 |
+| 统一响应 | `ApiResponse<{ code, message, data, traceId, timestamp }>` |
+| 统一认证上下文 | 请求头 `X-User-Id`、`X-Trace-Id`、`X-Permissions`；后端不信任客户端自定义业务身份字段 |
+| 管理端接口 | `POST /api/v1/notices` 创建公告；`PUT /api/v1/notices/{id}` 修改公告；`DELETE /api/v1/notices/{id}` 删除公告；`POST /api/v1/notices/{id}/publish` 发布公告；`POST /api/v1/notices/{id}/offline` 下线公告；`GET /api/v1/notices` 分页查询公告；`GET /api/v1/notices/{id}` 查询公告详情 |
+| 员工端接口 | `GET /api/v1/notices/public` 分页查询已发布公告；`GET /api/v1/notices/public/{id}` 查询公告详情；`POST /api/v1/notices/{id}/read` 标记已读；`GET /api/v1/notices/public/unread-count` 查询未读数量 |
+| 列表查询参数 | `keyword`、`status`、`topFlag`、`page`、`size`；默认按 `topFlag desc, publishedAt desc, updatedAt desc` 排序 |
 | 权限标识 | `notice:create`、`notice:update`、`notice:delete`、`notice:publish`、`notice:offline`、`notice:list`、`notice:view` |
-| 验收标准 | 能发布公告、能查看列表、能标记已读、能统计未读、能下线隐藏 |
-| 备注 | 交付物需包含表结构、接口清单、权限说明、测试用例和演示数据 |
+| 状态流转 | `DRAFT -> PUBLISHED`；`PUBLISHED -> OFFLINE`；`OFFLINE` 不可直接发布，需回到草稿后再操作；已发布公告不可直接删除 |
+| 已读规则 | 单个用户对单个公告仅允许一条已读记录；重复标记已读应幂等 |
+| 验收标准 | 能创建/发布/下线公告；能分页查询与查看详情；能标记已读并统计未读；权限与状态流转正确；接口测试通过 |
+| 开发清单 | 1. 完成实体、DTO、VO、Enum；2. 完成 Mapper 与 SQL；3. 完成 Service 与状态流转；4. 完成 Controller 与权限控制；5. 完成单元测试与接口测试；6. 更新 SQL、文档与演示数据 |
+| 备注 | 该模块当前采用单一 controller 方案，不拆分管理端/员工端 controller，前端按页面调用不同接口即可 |
+
+### 通知公告模块前端 API 约定
+| 项目 | 内容 |
+| --- | --- |
+| API 文件建议 | `src/api/notice.ts` 或按页面拆分为 `noticeAdmin.ts`、`noticePublic.ts` |
+| 请求头 | 自动携带 `X-User-Id`、`X-Trace-Id`、`X-Permissions`；前端不直接拼接业务身份信息 |
+| 管理端方法 | `createNotice`、`updateNotice`、`deleteNotice`、`publishNotice`、`offlineNotice`、`getNoticePage`、`getNoticeDetail` |
+| 员工端方法 | `getPublicNoticePage`、`getPublicNoticeDetail`、`markNoticeRead`、`getUnreadNoticeCount` |
+| 列表参数 | `keyword`、`status`、`topFlag`、`page`、`size` |
+| 返回结构 | 直接读取 `ApiResponse.data`；列表为 `NoticePageVO<NoticeListItemVO>`，详情为 `NoticeDetailVO`，未读数为 `NoticeUnreadCountVO` |
+| 页面映射 | 管理公告页、公告编辑页、公告详情页、员工公告页、员工公告详情页、未读角标组件 |
+| 联调注意 | `public` 接口只展示员工可见公告；管理端接口必须传权限头；已读接口需要登录用户 ID |
+| 交付要求 | 前端 API 命名与后端接口一致，页面和文档同步更新，不允许写死请求路径常量散落各处 |
+
+### 通知公告模块开发收口清单
+| 项目 | 是否完成 | 说明 |
+| --- | --- | --- |
+| 实体 / DTO / VO / Enum | 是 | 领域对象已就绪 |
+| Mapper / SQL | 是 | 基础 CRUD 与已读统计完成 |
+| Service / 状态流转 | 是 | 支持创建、修改、发布、下线、删除、已读、未读统计 |
+| Controller / 权限 / 用户上下文 | 是 | 统一单 controller、权限头、用户头已接入 |
+| 分页查询 | 是 | 支持 `page` / `size` / `keyword` / `status` / `topFlag` |
+| 测试 | 部分完成 | 单测与接口测试已补，暂不要求集成测试 |
+| 文档 | 是 | 已整理最终版接口文档和开发清单 |
+| 前端 API | 待同步 | 按本节约定更新前端 API 文件即可 |
+
 | 检索 | GET /api/v1/search/notices?q= | 公告全文检索 |
