@@ -19,6 +19,9 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
             """)
     SysUser findEnabledByUsername(@Param("username") String username);
 
+    @Select("SELECT COUNT(1) FROM sys_user WHERE username = #{username}")
+    long countByUsername(@Param("username") String username);
+
     @Select("""
             SELECT id, department_id, username, password_hash, display_name, phone, email, status, deleted
             FROM sys_user
