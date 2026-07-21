@@ -22,7 +22,7 @@ spring:
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:123456}
     hikari:
-      initialization-fail-timeout:
+      initialization-fail-timeout: 0
 oa:
   security:
     jwt:

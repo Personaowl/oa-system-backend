@@ -54,9 +54,8 @@ mvn -pl oa-user-service spring-boot:run
 
 All Nacos imports are optional so a module can still be compiled and unit-tested without Nacos. Business database calls require valid local database credentials.
 
-## First integration checkpoint
+## Authentication integration checkpoint
 
-The first team milestone is a login request flowing through Gateway to `oa-user-service`, returning a signed JWT, followed by an authenticated request to `/api/v1/users/me`.
+The login → JWT → Gateway authentication → current-user flow is implemented. Run `sql/02-seed-local-admin.sql`, then see [docs/auth-api.md](docs/auth-api.md) for the local test account and requests.
 
 See [docs/architecture.md](docs/architecture.md) and [docs/contributing.md](docs/contributing.md).
-
