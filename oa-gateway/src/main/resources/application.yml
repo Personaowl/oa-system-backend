@@ -57,6 +57,7 @@ oa:
     security:
       public-paths:
         - /api/v1/auth/login
+        - /api/v1/auth/register
         - /actuator/health/**
 
 management:
