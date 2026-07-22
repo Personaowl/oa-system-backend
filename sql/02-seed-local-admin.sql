@@ -24,6 +24,29 @@ INSERT INTO sys_role (id, code, name, status, deleted)
 VALUES (1, 'ADMIN', '系统管理员', 1, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), status = 1, deleted = 0;
 
+-- Migrate attendance permissions created by the earlier local seed at IDs 6 and 7.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT rp.role_id, 13
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'attendance:record:query';
+
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT rp.role_id, 14
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'attendance:statistics:query';
+
+DELETE rp
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code IN ('attendance:record:query', 'attendance:statistics:query')
+  AND p.id NOT IN (13, 14);
+
+DELETE FROM sys_permission
+WHERE code IN ('attendance:record:query', 'attendance:statistics:query')
+  AND id NOT IN (13, 14);
+
 INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
 VALUES
     (1, 0, 'user:read', '查看用户', 'BUTTON', NULL, 0),
@@ -37,10 +60,18 @@ VALUES
     (9, 0, 'notice:publish', '发布公告', 'BUTTON', NULL, 0),
     (10, 0, 'notice:offline', '下线公告', 'BUTTON', NULL, 0),
     (11, 0, 'notice:list', '公告列表', 'BUTTON', NULL, 0),
-    (12, 0, 'notice:view', '公告详情', 'BUTTON', NULL, 0)
+    (12, 0, 'notice:view', '公告详情', 'BUTTON', NULL, 0),
+    (13, 0, 'attendance:record:query', '查询全员考勤记录', 'BUTTON', NULL, 0),
+    (14, 0, 'attendance:statistics:query', '查询考勤汇总统计', 'BUTTON', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
-       (1, 8), (1, 9), (1, 10), (1, 11), (1, 12);
+SELECT 1, id
+FROM sys_permission
+WHERE code IN (
+    'user:read', 'attendance:read', 'flow:read', 'notice:read', 'system:admin',
+    'notice:create', 'notice:update', 'notice:delete', 'notice:publish',
+    'notice:offline', 'notice:list', 'notice:view',
+    'attendance:record:query', 'attendance:statistics:query'
+);
