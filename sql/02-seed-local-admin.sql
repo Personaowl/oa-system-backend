@@ -28,6 +28,29 @@ VALUES
     (4, 'MANAGER', '部门主管', 1, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), status = 1, deleted = 0;
 
+-- Migrate attendance permissions created by earlier seeds at conflicting IDs.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT rp.role_id, 28
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'attendance:record:query';
+
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT rp.role_id, 29
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'attendance:statistics:query';
+
+DELETE rp
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code IN ('attendance:record:query', 'attendance:statistics:query')
+  AND p.id NOT IN (28, 29);
+
+DELETE FROM sys_permission
+WHERE code IN ('attendance:record:query', 'attendance:statistics:query')
+  AND id NOT IN (28, 29);
+
 INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
 VALUES
     (1, 0, 'user:read', '查看用户', 'BUTTON', NULL, 0),
@@ -56,30 +79,42 @@ VALUES
     (24, 0, 'sys:permission:list', '权限列表', 'API', '/api/v1/permissions', 0),
     (25, 0, 'sys:user:role:list', '用户角色列表', 'API', '/api/v1/users/{id}/roles', 0),
     (26, 0, 'sys:user:assign-role', '分配用户角色', 'API', '/api/v1/users/{id}/roles', 0),
-    (27, 0, 'ai:chat', 'AI办公助手', 'API', '/api/v1/ai/chat', 0)
+    (27, 0, 'ai:chat', 'AI办公助手', 'API', '/api/v1/ai/chat', 0),
+    (28, 0, 'attendance:record:query', '查询全员考勤记录', 'BUTTON', NULL, 0),
+    (29, 0, 'attendance:statistics:query', '查询考勤汇总统计', 'BUTTON', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
-       (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14),
-       (1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20), (1, 21),
-       (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27);
+SELECT 1, id
+FROM sys_permission
+WHERE deleted = 0;
 
 -- Registered users receive the least-privilege employee role by default.
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (2, 2), (2, 3), (2, 4), (2, 27);
+SELECT 2, id
+FROM sys_permission
+WHERE code IN ('attendance:read', 'flow:read', 'notice:read', 'ai:chat');
 
 -- HR can maintain organization data and the full notice lifecycle.
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (3, 1), (3, 2), (3, 3), (3, 4),
-       (3, 6), (3, 7), (3, 8), (3, 9), (3, 10), (3, 11), (3, 12),
-       (3, 13), (3, 14), (3, 15), (3, 16), (3, 17),
-       (3, 18), (3, 19), (3, 24), (3, 25), (3, 26), (3, 27);
+SELECT 3, id
+FROM sys_permission
+WHERE code IN (
+    'user:read', 'attendance:read', 'flow:read', 'notice:read',
+    'notice:create', 'notice:update', 'notice:delete', 'notice:publish',
+    'notice:offline', 'notice:list', 'notice:view',
+    'sys:dept:list', 'sys:dept:view', 'sys:dept:create', 'sys:dept:update', 'sys:dept:delete',
+    'sys:role:list', 'sys:role:view', 'sys:permission:list',
+    'sys:user:role:list', 'sys:user:assign-role', 'ai:chat',
+    'attendance:record:query', 'attendance:statistics:query'
+);
 
 -- Department managers receive business read/review permissions only.
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-VALUES (4, 1), (4, 2), (4, 3), (4, 4), (4, 27);
+SELECT 4, id
+FROM sys_permission
+WHERE code IN ('user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat');
 
 -- Backfill accounts created before default role assignment was introduced.
 INSERT IGNORE INTO sys_user_role (user_id, role_id)
