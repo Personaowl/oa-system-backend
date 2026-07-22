@@ -1,46 +1,51 @@
 server.port: ${AI_SERVICE_PORT:8105}
 spring:
-  application:
-    name: oa-ai-service
-  config:
-    import:
-      - optional:nacos:oa-common.yaml?group=DEFAULT_GROUP&refreshEnabled=true
-      - optional:nacos:${spring.application.name}.yaml?group=DEFAULT_GROUP&refreshEnabled=true
-  cloud:
-    nacos:
-      discovery:
-        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
-        username: ${NACOS_USERNAME:}
-        password: ${NACOS_PASSWORD:}
-      config:
-        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
-        username: ${NACOS_USERNAME:}
-        password: ${NACOS_PASSWORD:}
+  application.name: oa-ai-service
+  config.import:
+    - optional:nacos:oa-common.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+    - optional:nacos:${spring.application.name}.yaml?group=DEFAULT_GROUP&refreshEnabled=true
+  cloud.nacos:
+    discovery:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+    config:
+      server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      username: ${NACOS_USERNAME:}
+      password: ${NACOS_PASSWORD:}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/oa_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:20050105}
+    driver-class-name: com.mysql.cj.jdbc.Driver
   ai:
     openai:
       base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
-      api-key: ${SILICONFLOW_API_KEY}
-      chat:
-        options:
-          model: ${SILICONFLOW_CHAT_MODEL:Pro/zai-org/GLM-4.7}
-      embedding:
-        options:
-          model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
+      api-key: ${SILICONFLOW_API_KEY:sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq}
+      chat.options.model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
+      embedding.options.model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
     vectorstore:
       redis:
         initialize-schema: true
-        index-name: oa-knowledge-index
-        prefix: oa:knowledge:
-  data:
-    redis:
-      host: ${REDIS_HOST:127.0.0.1}
-      port: ${REDIS_PORT:6379}
+        index-name: ${AI_RAG_INDEX_NAME:oa-knowledge-index}
+        prefix: ${AI_RAG_KNOWLEDGE_PREFIX:oa:knowledge:}
+  data.redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      probes:
-        enabled: true
+  endpoints.web.exposure.include: health,info,env
+  endpoint.health.probes.enabled: true
+ai:
+  rag:
+    top-k: ${AI_RAG_TOP_K:3}
+    min-score: ${AI_RAG_MIN_SCORE:0.75}
+    max-chunk-size: ${AI_RAG_MAX_CHUNK_SIZE:600}
+    chunk-overlap: ${AI_RAG_CHUNK_OVERLAP:80}
+    knowledge-prefix: ${AI_RAG_KNOWLEDGE_PREFIX:oa:knowledge:}
+    index-name: ${AI_RAG_INDEX_NAME:oa-knowledge-index}
+    chat-model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
+    embedding-model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
+    base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
+    api-key: ${SILICONFLOW_API_KEY:sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq}
+    redis-host: ${REDIS_HOST:127.0.0.1}
+    redis-port: ${REDIS_PORT:6379}

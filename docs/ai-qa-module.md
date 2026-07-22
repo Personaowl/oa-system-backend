@@ -356,41 +356,182 @@
 
 “未在已审核的考勤/审批/人事制度中检索到可确认依据，建议联系管理员确认最新制度版本。”
 
-## 12. 接口设计建议
+## 12. 前端 API 接口清单
+
+本节面向前端联调用，建议统一封装在 `src/api/ai.ts`，若页面拆分较多，也可按“知识库管理 / 问答 / 日志”拆成多个文件。
 
 ### 12.1 问答接口
 
-- `POST /api/v1/ai/chat`
+#### 1）发送问答请求
 
-请求参数建议：
+- 方法：`POST`
+- 路径：`/api/v1/ai/chat`
+- 用途：提交用户问题，返回基于 RAG 的答案
 
-- `question`
-- `sessionId`
-- `knowledgeDomain`
-- `topK`
-- `stream`
+**请求参数**
 
-返回内容建议：
+- `question`：问题内容，必填
+- `sessionId`：会话 ID，可选
+- `knowledgeDomain`：知识域，`ATTENDANCE` / `FLOW` / `HR` / `ALL`
+- `topK`：召回条数，默认 3
+- `stream`：是否流式返回，前端可选
 
-- `answer`
-- `citations`
-- `hitFlag`
-- `matchedDocs`
-- `traceId`
+**返回内容**
+
+- `answer`：模型回答
+- `citations`：引用列表
+- `hitFlag`：是否命中知识库
+- `matchedDocs`：命中文档摘要
+- `traceId`：链路追踪 ID
+- `sessionId`：会话 ID
+
+#### 2）获取问答历史
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/chat-sessions`
+- 用途：查询当前用户的会话列表
+
+**查询参数**
+
+- `page`
+- `size`
+- `keyword`：可按标题或首问搜索
+
+#### 3）获取会话详情
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/chat-sessions/{id}`
+- 用途：查看某次会话的问答记录明细
 
 ### 12.2 知识管理接口
 
-- `POST /api/v1/ai/knowledge-docs`
-- `POST /api/v1/ai/knowledge-docs/{id}/approve`
-- `POST /api/v1/ai/knowledge-docs/{id}/reindex`
-- `GET /api/v1/ai/knowledge-docs`
-- `GET /api/v1/ai/knowledge-docs/{id}`
-- `DELETE /api/v1/ai/knowledge-docs/{id}`
+#### 1）上传知识文档
 
-### 12.3 日志接口（可选）
+- 方法：`POST`
+- 路径：`/api/v1/ai/knowledge-docs`
+- 用途：上传制度文档并创建知识记录
 
-- `GET /api/v1/ai/chat-logs`
-- `GET /api/v1/ai/chat-logs/{id}`
+**请求方式建议**
+
+- `multipart/form-data`
+
+**字段建议**
+
+- `file`：制度文件
+- `docTitle`：文档标题
+- `docDomain`：知识域
+- `docVersion`：版本号
+- `effectiveDate`：生效日期
+- `sourceType`：来源类型
+
+#### 2）查询知识文档列表
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/knowledge-docs`
+- 用途：分页查询知识文档
+
+**查询参数**
+
+- `keyword`
+- `docDomain`
+- `status`
+- `page`
+- `size`
+
+#### 3）查询知识文档详情
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/knowledge-docs/{id}`
+- 用途：查看文档详情、版本和审核状态
+
+#### 4）审核知识文档
+
+- 方法：`POST`
+- 路径：`/api/v1/ai/knowledge-docs/{id}/approve`
+- 用途：将文档从待审核切换为已审核，并触发入库
+
+#### 5）重建索引
+
+- 方法：`POST`
+- 路径：`/api/v1/ai/knowledge-docs/{id}/reindex`
+- 用途：重新切分并写入 Redis 向量索引
+
+#### 6）下线知识文档
+
+- 方法：`POST` 或 `DELETE` 均可按团队约定
+- 路径：`/api/v1/ai/knowledge-docs/{id}/retire`
+- 用途：将已发布文档下线，停止参与检索
+
+### 12.3 索引与任务接口
+
+#### 1）查询索引任务列表
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/index-tasks`
+- 用途：查看入库、重建、删除索引任务状态
+
+**查询参数**
+
+- `status`
+- `taskType`
+- `docId`
+- `page`
+- `size`
+
+#### 2）查询索引任务详情
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/index-tasks/{id}`
+- 用途：查看任务错误信息和重试情况
+
+### 12.4 问答日志接口
+
+#### 1）查询问答日志列表
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/chat-logs`
+- 用途：查询问答记录
+
+**查询参数**
+
+- `userId`
+- `keyword`
+- `hitFlag`
+- `knowledgeDomain`
+- `page`
+- `size`
+
+#### 2）查询问答日志详情
+
+- 方法：`GET`
+- 路径：`/api/v1/ai/chat-logs/{id}`
+- 用途：查看某次回答的引用片段、召回结果和耗时
+
+### 12.5 前端 API 文件建议
+
+- `src/api/ai.ts`：问答 + 历史 + 日志
+- `src/api/aiKnowledge.ts`：知识文档管理
+- `src/api/aiTask.ts`：索引任务管理
+
+### 12.6 返回结构建议
+
+前端统一读取 `ApiResponse.data`，建议具体 DTO 如下：
+
+- `AiChatResponseVO`
+- `AiChatSessionVO`
+- `AiChatLogVO`
+- `AiKnowledgeDocVO`
+- `AiKnowledgeChunkVO`
+- `AiIndexTaskVO`
+
+### 12.7 联调用注意事项
+
+- 问答接口必须携带登录态
+- 管理接口必须校验权限标识
+- `public` 类接口不存在于本模块；AI 模块默认仅供登录用户使用
+- 引用列表建议前端可点击展开，查看来源标题与原文片段
+
+## 13. 权限设计
 
 ## 13. 权限设计
 
@@ -546,3 +687,350 @@
 
 文档说明：
 本文件作为独立开发文档使用，可与主项目总文档并行维护。若后续 AI 模块范围扩大，应优先更新本文件，再同步回总文档。
+
+## 23. 数据库建表 SQL
+
+以下 SQL 已整理到独立脚本 `sql/03-ai-knowledge.sql`，建议由 `oa-ai-service` 单独维护并在初始化脚本中执行。
+## 24. 后端 Controller / DTO / VO 清单
+
+### 24.1 Controller 清单
+
+建议在 `oa-ai-service` 中按职责拆分为以下控制器：
+
+- `AiChatController`
+  - `POST /api/v1/ai/chat`
+  - `GET /api/v1/ai/chat-sessions`
+  - `GET /api/v1/ai/chat-sessions/{id}`
+
+- `AiKnowledgeDocController`
+  - `POST /api/v1/ai/knowledge-docs`
+  - `GET /api/v1/ai/knowledge-docs`
+  - `GET /api/v1/ai/knowledge-docs/{id}`
+  - `POST /api/v1/ai/knowledge-docs/{id}/approve`
+  - `POST /api/v1/ai/knowledge-docs/{id}/reindex`
+  - `POST /api/v1/ai/knowledge-docs/{id}/retire`
+
+- `AiIndexTaskController`
+  - `GET /api/v1/ai/index-tasks`
+  - `GET /api/v1/ai/index-tasks/{id}`
+
+- `AiChatLogController`
+  - `GET /api/v1/ai/chat-logs`
+  - `GET /api/v1/ai/chat-logs/{id}`
+
+### 24.2 DTO 清单
+
+#### 问答相关 DTO
+
+- `AiChatRequestDTO`
+  - `question`
+  - `sessionId`
+  - `knowledgeDomain`
+  - `topK`
+  - `stream`
+
+- `AiChatSessionQueryDTO`
+  - `page`
+  - `size`
+  - `keyword`
+
+- `AiChatLogQueryDTO`
+  - `page`
+  - `size`
+  - `userId`
+  - `keyword`
+  - `knowledgeDomain`
+  - `hitFlag`
+
+#### 知识文档 DTO
+
+- `AiKnowledgeDocCreateDTO`
+  - `docTitle`
+  - `docDomain`
+  - `docVersion`
+  - `effectiveDate`
+  - `sourceType`
+  - `file`
+
+- `AiKnowledgeDocQueryDTO`
+  - `page`
+  - `size`
+  - `keyword`
+  - `docDomain`
+  - `status`
+
+- `AiKnowledgeDocUpdateDTO`
+  - `docTitle`
+  - `docDomain`
+  - `docVersion`
+  - `effectiveDate`
+
+#### 索引任务 DTO
+
+- `AiIndexTaskQueryDTO`
+  - `page`
+  - `size`
+  - `status`
+  - `taskType`
+  - `docId`
+
+### 24.3 VO 清单
+
+#### 问答 VO
+
+- `AiChatResponseVO`
+  - `answer`
+  - `citations`
+  - `hitFlag`
+  - `matchedDocs`
+  - `traceId`
+  - `sessionId`
+
+- `AiChatSessionVO`
+  - `id`
+  - `sessionNo`
+  - `sessionTitle`
+  - `knowledgeDomain`
+  - `latestQuestion`
+  - `latestAnswer`
+  - `messageCount`
+  - `status`
+  - `createdAt`
+
+- `AiChatLogVO`
+  - `id`
+  - `sessionId`
+  - `question`
+  - `answer`
+  - `citations`
+  - `modelName`
+  - `topK`
+  - `confidenceScore`
+  - `hitFlag`
+  - `latencyMs`
+  - `createdAt`
+
+#### 知识文档 VO
+
+- `AiKnowledgeDocVO`
+  - `id`
+  - `docTitle`
+  - `docDomain`
+  - `docVersion`
+  - `fileName`
+  - `fileUrl`
+  - `status`
+  - `effectiveDate`
+  - `approvedBy`
+  - `approvedAt`
+  - `createdAt`
+  - `updatedAt`
+
+- `AiKnowledgeChunkVO`
+  - `id`
+  - `docId`
+  - `chunkNo`
+  - `chunkTitle`
+  - `chunkText`
+  - `status`
+  - `createdAt`
+
+#### 索引任务 VO
+
+- `AiIndexTaskVO`
+  - `id`
+  - `taskNo`
+  - `docId`
+  - `taskType`
+  - `status`
+  - `errorMessage`
+  - `retryCount`
+  - `createdAt`
+  - `updatedAt`
+
+### 24.4 推荐 Service 拆分
+
+- `AiChatService`
+  - 处理提问、检索、提示词拼装、生成回答、保存记录
+
+- `AiKnowledgeDocService`
+  - 处理文档创建、审核、下线、重建索引
+
+- `AiIndexTaskService`
+  - 处理异步任务查询与任务状态流转
+
+- `AiVectorStoreService`
+  - 封装 Redis 向量写入与召回
+
+- `AiEmbeddingService`
+  - 封装 embedding 生成
+
+### 24.5 后端返回建议
+
+统一返回 `ApiResponse<T>`，错误时保留 `traceId`，便于前端和日志联动。
+
+## 25. 前端页面与路由设计
+
+### 25.1 页面结构
+
+建议 AI 模块前端至少包含以下页面：
+
+1. **AI 问答首页**
+   - 侧边栏展示历史会话
+   - 主区域展示对话内容
+   - 底部输入问题与发送按钮
+   - 支持知识域选择和 TopK 调整
+
+2. **知识文档管理页**
+   - 文档列表
+   - 文档上传
+   - 文档审核
+   - 文档下线
+   - 文档重建索引
+
+3. **问答日志页**
+   - 问题列表
+   - 命中情况
+   - 耗时
+   - 引用来源
+
+4. **索引任务页**
+   - 任务状态
+   - 失败原因
+   - 重试记录
+
+### 25.2 路由设计
+
+建议路由如下：
+
+- `/ai/chat`
+- `/ai/knowledge-docs`
+- `/ai/chat-logs`
+- `/ai/index-tasks`
+
+如果项目采用菜单权限控制，可按如下菜单项配置：
+
+- `AI 智能问答`
+- `知识文档管理`
+- `问答日志`
+- `索引任务`
+
+### 25.3 页面交互建议
+
+- 问答页支持“发送后立即显示加载中”
+- 回答中引用片段可折叠查看
+- 知识文档上传后展示入库状态
+- 审核通过后可直接触发重建索引
+- 日志页支持按命中状态和知识域筛选
+
+### 25.4 前端 API 文件建议
+
+- `src/api/ai.ts`
+  - `chat`
+  - `getChatSessionPage`
+  - `getChatSessionDetail`
+  - `getChatLogPage`
+  - `getChatLogDetail`
+
+- `src/api/aiKnowledge.ts`
+  - `createKnowledgeDoc`
+  - `getKnowledgeDocPage`
+  - `getKnowledgeDocDetail`
+  - `approveKnowledgeDoc`
+  - `reindexKnowledgeDoc`
+  - `retireKnowledgeDoc`
+
+- `src/api/aiTask.ts`
+  - `getIndexTaskPage`
+  - `getIndexTaskDetail`
+
+## 26. `oa-ai-service` 代码骨架建议
+
+### 26.1 推荐目录结构
+
+```text
+oa-ai-service/
+├─ src/
+│  ├─ main/
+│  │  ├─ java/
+│  │  │  └─ com/personaowl/oa/ai/
+│  │  │     ├─ AiServiceApplication.java
+│  │  │     ├─ api/
+│  │  │     │  ├─ AiChatController.java
+│  │  │     │  ├─ AiKnowledgeDocController.java
+│  │  │     │  ├─ AiIndexTaskController.java
+│  │  │     │  └─ AiChatLogController.java
+│  │  │     ├─ application/
+│  │  │     │  ├─ service/
+│  │  │     │  └─ dto/
+│  │  │     ├─ domain/
+│  │  │     │  ├─ entity/
+│  │  │     │  ├─ vo/
+│  │  │     │  └─ enums/
+│  │  │     ├─ infrastructure/
+│  │  │     │  ├─ config/
+│  │  │     │  ├─ embedding/
+│  │  │     │  ├─ vector/
+│  │  │     │  └─ repository/
+│  │  │     └─ common/
+│  │  └─ resources/
+│  │     ├─ application.yml
+│  │     └─ db/migration/
+└─ pom.xml
+```
+
+### 26.2 分层职责
+
+- `api`
+  - 只负责参数接收、权限注解、返回封装
+- `application`
+  - 负责编排业务流程
+- `domain`
+  - 放实体、枚举、值对象、核心规则
+- `infrastructure`
+  - 负责数据库、Redis、Ollama、向量检索、配置
+
+### 26.3 核心启动类
+
+- `AiServiceApplication`
+
+### 26.4 关键配置类
+
+- `OllamaClientConfig`
+- `SpringAiConfig`
+- `RedisVectorStoreConfig`
+- `AiProperties`
+- `AiWebMvcConfig`
+- `AiSecurityConfig`（如与 common-security 集成）
+
+### 26.5 启动后最小可验收链路
+
+1. 服务启动成功
+2. 文档上传成功
+3. 文档审核成功
+4. 索引生成成功
+5. 提问成功并返回引用
+6. 日志成功落库
+
+## 27. 建议交付顺序
+
+1. 先建表与实体
+2. 再做知识文档上传和审核
+3. 再做向量入库与问答接口
+4. 再做前端问答页
+5. 最后补日志、任务、测试和演示数据
+联调可直接用的接口清单，包括：
+
+POST /api/v1/ai/chat
+GET /api/v1/ai/chat-sessions
+GET /api/v1/ai/chat-sessions/{id}
+POST /api/v1/ai/knowledge-docs
+GET /api/v1/ai/knowledge-docs
+GET /api/v1/ai/knowledge-docs/{id}
+POST /api/v1/ai/knowledge-docs/{id}/approve
+POST /api/v1/ai/knowledge-docs/{id}/reindex
+POST /api/v1/ai/knowledge-docs/{id}/retire
+GET /api/v1/ai/index-tasks
+GET /api/v1/ai/index-tasks/{id}
+GET /api/v1/ai/chat-logs
+GET /api/v1/ai/chat-logs/{id}

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personaowl.oa.ai.infrastructure.mapper.AiChatSessionMapper">
+
+    <resultMap id="BaseResultMap" type="com.personaowl.oa.ai.domain.entity.AiChatSession">
+        <id column="id" property="id"/>
+        <result column="session_no" property="sessionNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="session_title" property="sessionTitle"/>
+        <result column="knowledge_domain" property="knowledgeDomain"/>
+        <result column="latest_question" property="latestQuestion"/>
+        <result column="latest_answer" property="latestAnswer"/>
+        <result column="message_count" property="messageCount"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.personaowl.oa.ai.domain.entity.AiChatSession" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_chat_session
+        (session_no, user_id, session_title, knowledge_domain, latest_question, latest_answer, message_count, status, created_at, updated_at)
+        VALUES
+        (#{sessionNo}, #{userId}, #{sessionTitle}, #{knowledgeDomain}, #{latestQuestion}, #{latestAnswer}, #{messageCount}, #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateById" parameterType="com.personaowl.oa.ai.domain.entity.AiChatSession">
+        UPDATE ai_chat_session
+        SET session_no = #{sessionNo},
+            user_id = #{userId},
+            session_title = #{sessionTitle},
+            knowledge_domain = #{knowledgeDomain},
+            latest_question = #{latestQuestion},
+            latest_answer = #{latestAnswer},
+            message_count = #{messageCount},
+            status = #{status},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM ai_chat_session WHERE id = #{id}
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT *
+        FROM ai_chat_session
+        WHERE user_id = #{userId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (session_title LIKE CONCAT('%', #{keyword}, '%')
+                 OR latest_question LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY updated_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+</mapper>

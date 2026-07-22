@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personaowl.oa.ai.infrastructure.mapper.AiChatLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.personaowl.oa.ai.domain.entity.AiChatLog">
+        <id column="id" property="id"/>
+        <result column="session_id" property="sessionId"/>
+        <result column="user_id" property="userId"/>
+        <result column="question" property="question"/>
+        <result column="answer" property="answer"/>
+        <result column="retrieved_doc_ids" property="retrievedDocIds"/>
+        <result column="retrieved_chunk_ids" property="retrievedChunkIds"/>
+        <result column="citations_json" property="citationsJson"/>
+        <result column="model_name" property="modelName"/>
+        <result column="top_k" property="topK"/>
+        <result column="confidence_score" property="confidenceScore"/>
+        <result column="hit_flag" property="hitFlag"/>
+        <result column="latency_ms" property="latencyMs"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.personaowl.oa.ai.domain.entity.AiChatLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_chat_log
+        (session_id, user_id, question, answer, retrieved_doc_ids, retrieved_chunk_ids, citations_json, model_name, top_k,
+         confidence_score, hit_flag, latency_ms, created_at)
+        VALUES
+        (#{sessionId}, #{userId}, #{question}, #{answer}, #{retrievedDocIds}, #{retrievedChunkIds}, #{citationsJson}, #{modelName}, #{topK},
+         #{confidenceScore}, #{hitFlag}, #{latencyMs}, #{createdAt})
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM ai_chat_log WHERE id = #{id}
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT *
+        FROM ai_chat_log
+        WHERE 1 = 1
+        <if test="queryUserId != null">
+            AND user_id = #{queryUserId}
+        </if>
+        <if test="userId != null">
+            AND user_id = #{userId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (question LIKE CONCAT('%', #{keyword}, '%')
+                 OR answer LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+</mapper>

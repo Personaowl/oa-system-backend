@@ -3,4 +3,5 @@ oa:
     security:
       public-paths:
         - /api/v1/auth/login
+        - /api/v1/ai/**
         - /actuator/health/**
