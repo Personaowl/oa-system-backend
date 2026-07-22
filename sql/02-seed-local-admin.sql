@@ -51,6 +51,21 @@ DELETE FROM sys_permission
 WHERE code IN ('attendance:record:query', 'attendance:statistics:query')
   AND id NOT IN (28, 29);
 
+-- Migrate the approval permission created by earlier flow seeds at a conflicting ID.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT rp.role_id, 30
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'flow:task:approve';
+
+DELETE rp
+FROM sys_role_permission rp
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE p.code = 'flow:task:approve' AND p.id <> 30;
+
+DELETE FROM sys_permission
+WHERE code = 'flow:task:approve' AND id <> 30;
+
 INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
 VALUES
     (1, 0, 'user:read', '查看用户', 'BUTTON', NULL, 0),
@@ -81,7 +96,8 @@ VALUES
     (26, 0, 'sys:user:assign-role', '分配用户角色', 'API', '/api/v1/users/{id}/roles', 0),
     (27, 0, 'ai:chat', 'AI办公助手', 'API', '/api/v1/ai/chat', 0),
     (28, 0, 'attendance:record:query', '查询全员考勤记录', 'BUTTON', NULL, 0),
-    (29, 0, 'attendance:statistics:query', '查询考勤汇总统计', 'BUTTON', NULL, 0)
+    (29, 0, 'attendance:statistics:query', '查询考勤汇总统计', 'BUTTON', NULL, 0),
+    (30, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
@@ -114,7 +130,10 @@ WHERE code IN (
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 4, id
 FROM sys_permission
-WHERE code IN ('user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat');
+WHERE code IN (
+    'user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat',
+    'flow:task:approve'
+);
 
 -- Backfill accounts created before default role assignment was introduced.
 INSERT IGNORE INTO sys_user_role (user_id, role_id)

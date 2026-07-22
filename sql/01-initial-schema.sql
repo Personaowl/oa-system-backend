@@ -90,6 +90,17 @@ CREATE TABLE IF NOT EXISTS flow_request (
     KEY idx_flow_applicant_status (applicant_id, status)
 ) COMMENT='请假与加班申请';
 
+CREATE TABLE IF NOT EXISTS flow_action_log (
+    id BIGINT PRIMARY KEY COMMENT '审批操作日志主键',
+    request_id BIGINT NOT NULL COMMENT '流程申请ID',
+    operator_id BIGINT NOT NULL COMMENT '审批人ID',
+    action VARCHAR(32) NOT NULL COMMENT '审批动作：APPROVE/REJECT',
+    comment VARCHAR(500) NULL COMMENT '审批意见',
+    operated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    KEY idx_flow_action_request (request_id, operated_at),
+    KEY idx_flow_action_operator (operator_id, operated_at)
+) COMMENT='审批操作日志';
+
 CREATE TABLE IF NOT EXISTS notice (
     id BIGINT PRIMARY KEY COMMENT '公告主键',
     title VARCHAR(200) NOT NULL COMMENT '公告标题',
