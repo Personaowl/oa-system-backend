@@ -6,6 +6,7 @@ import com.personaowl.oa.common.security.JwtClaims;
 import com.personaowl.oa.common.security.JwtProperties;
 import com.personaowl.oa.common.security.JwtTokenService;
 import com.personaowl.oa.user.api.dto.LoginRequest;
+import com.personaowl.oa.user.api.dto.RegisterRequest;
 import com.personaowl.oa.user.domain.SysUser;
 import com.personaowl.oa.user.mapper.SysUserMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,6 +94,35 @@ class AuthServiceTest {
         assertThat(response.displayName()).isEqualTo("系统管理员");
         assertThat(response.roles()).containsExactly("ADMIN");
         assertThat(response.permissions()).containsExactly("user:read");
+    }
+
+    @Test
+    void registerAssignsDefaultEmployeeRoleAndReturnsPermissions() {
+        when(userMapper.countByUsername("mty")).thenReturn(0L);
+        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
+        when(userMapper.findEnabledRoleIdByCode("EMPLOYEE")).thenReturn(2L);
+        when(userMapper.findRoleCodes(anyLong())).thenReturn(List.of("EMPLOYEE"));
+        when(userMapper.findPermissionCodes(anyLong())).thenReturn(List.of("attendance:read", "flow:read", "notice:read", "ai:chat"));
+
+        var response = authService.register(new RegisterRequest(" mty ", "123456"));
+
+        assertThat(response.username()).isEqualTo("mty");
+        assertThat(response.roles()).containsExactly("EMPLOYEE");
+        assertThat(response.permissions()).contains("attendance:read", "flow:read", "notice:read", "ai:chat");
+        verify(userMapper).insertUserRole(anyLong(), eq(2L));
+    }
+
+    @Test
+    void registerFailsWhenDefaultEmployeeRoleIsMissing() {
+        when(userMapper.countByUsername("mty")).thenReturn(0L);
+        when(passwordEncoder.encode("123456")).thenReturn("encoded-password");
+        when(userMapper.findEnabledRoleIdByCode("EMPLOYEE")).thenReturn(null);
+
+        assertThatThrownBy(() -> authService.register(new RegisterRequest("mty", "123456")))
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.errorCode()).isEqualTo(ErrorCode.SYSTEM_ERROR);
+                    assertThat(exception.getMessage()).isEqualTo("默认员工角色未初始化");
+                });
     }
 
     private SysUser user() {

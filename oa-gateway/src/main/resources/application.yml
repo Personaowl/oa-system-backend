@@ -25,7 +25,7 @@ spring:
             - id: oa-user-service
               uri: lb://oa-user-service
               predicates:
-                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/departments/**,/api/v1/roles/**
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/departments/**,/api/v1/roles/**,/api/v1/permissions/**
             - id: oa-attendance-service
               uri: lb://oa-attendance-service
               predicates:

@@ -18,6 +18,11 @@ public class CommonWebAutoConfiguration {
     }
 
     @Bean
+    PermissionGuard permissionGuard() {
+        return new PermissionGuard();
+    }
+
+    @Bean
     Jackson2ObjectMapperBuilderCustomizer longToStringCustomizer() {
         return builder -> builder.serializerByType(Long.class, ToStringSerializer.instance);
     }

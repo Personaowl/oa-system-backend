@@ -2,6 +2,7 @@ package com.personaowl.oa.notice.api;
 
 import com.personaowl.oa.common.web.CommonWebAutoConfiguration;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
+import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
 import com.personaowl.oa.notice.domain.entity.Notice;
 import com.personaowl.oa.notice.domain.enums.NoticeStatus;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -114,9 +116,18 @@ class NoticeControllerTest {
         NoticeListItemVO item = new NoticeListItemVO();
         item.setId(1L);
         item.setTitle("公告标题");
-        when(noticeService.listPublished(any(), eq(100L))).thenReturn(new NoticePageVO<>(1L, List.of(item)));
+        when(noticeService.listPublished(
+                argThat((NoticeQueryRequest request) -> request.getPage() == 2
+                        && request.getSize() == 10
+                        && "制度".equals(request.getKeyword())),
+                eq(100L))).thenReturn(new NoticePageVO<>(1L, List.of(item)));
 
-        mockMvc.perform(get("/api/v1/notices/public").header("X-User-Id", "100"))
+        mockMvc.perform(get("/api/v1/notices/public")
+                        .param("page", "2")
+                        .param("size", "10")
+                        .param("keyword", "制度")
+                        .header("X-User-Id", "100")
+                        .header("X-Permissions", "notice:read"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.records[0].title").value("公告标题"));
@@ -124,7 +135,7 @@ class NoticeControllerTest {
 
     @Test
     void publicListWithoutUserIdShouldReturnUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/v1/notices/public"))
+        mockMvc.perform(get("/api/v1/notices/public").header("X-Permissions", "notice:read"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("A0103"));
     }
@@ -133,7 +144,9 @@ class NoticeControllerTest {
     void unreadCountShouldReturnValue() throws Exception {
         when(noticeService.unreadCount(100L)).thenReturn(new NoticeUnreadCountVO(3L));
 
-        mockMvc.perform(get("/api/v1/notices/public/unread-count").header("X-User-Id", "100"))
+        mockMvc.perform(get("/api/v1/notices/public/unread-count")
+                        .header("X-User-Id", "100")
+                        .header("X-Permissions", "notice:read"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.unreadCount").value(3));
     }
@@ -147,7 +160,9 @@ class NoticeControllerTest {
         vo.setRead(true);
         when(noticeService.read(1L, 100L)).thenReturn(vo);
 
-        mockMvc.perform(post("/api/v1/notices/1/read").header("X-User-Id", "100"))
+        mockMvc.perform(post("/api/v1/notices/1/read")
+                        .header("X-User-Id", "100")
+                        .header("X-Permissions", "notice:read"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.read").value(true));
     }

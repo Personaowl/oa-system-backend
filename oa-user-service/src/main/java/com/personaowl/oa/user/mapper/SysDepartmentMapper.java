@@ -119,7 +119,7 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
      */
     @Update("""
             UPDATE sys_department
-            SET name = CONCAT(name, '_deleted_', id),
+            SET name = CONCAT('deleted_', id),
                 deleted = 1,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}

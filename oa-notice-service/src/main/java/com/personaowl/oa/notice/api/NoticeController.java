@@ -4,6 +4,7 @@ import com.personaowl.oa.common.core.api.ApiResponse;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import com.personaowl.oa.common.core.web.RequestHeaders;
+import com.personaowl.oa.common.web.PermissionGuard;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
@@ -23,17 +24,15 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 @RestController
 @RequestMapping("/api/v1/notices")
 public class NoticeController {
     private final NoticeService noticeService;
+    private final PermissionGuard permissionGuard;
 
-    public NoticeController(NoticeService noticeService) {
+    public NoticeController(NoticeService noticeService, PermissionGuard permissionGuard) {
         this.noticeService = noticeService;
+        this.permissionGuard = permissionGuard;
     }
 
     @PostMapping
@@ -41,7 +40,7 @@ public class NoticeController {
                                       @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                       @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                       @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:create");
+        permissionGuard.require(permissions, "notice:create");
         return ApiResponse.success(noticeService.create(request, requireUserId(userId)), traceId);
     }
 
@@ -51,7 +50,7 @@ public class NoticeController {
                                       @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                       @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                       @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:update");
+        permissionGuard.require(permissions, "notice:update");
         return ApiResponse.success(noticeService.update(id, request, requireUserId(userId)), traceId);
     }
 
@@ -60,7 +59,7 @@ public class NoticeController {
                                       @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                       @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                       @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:delete");
+        permissionGuard.require(permissions, "notice:delete");
         return ApiResponse.success(noticeService.delete(id, requireUserId(userId)), traceId);
     }
 
@@ -69,7 +68,7 @@ public class NoticeController {
                                        @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                        @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:publish");
+        permissionGuard.require(permissions, "notice:publish");
         return ApiResponse.success(noticeService.publish(id, requireUserId(userId)), traceId);
     }
 
@@ -78,7 +77,7 @@ public class NoticeController {
                                        @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                        @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:offline");
+        permissionGuard.require(permissions, "notice:offline");
         return ApiResponse.success(noticeService.offline(id, requireUserId(userId)), traceId);
     }
 
@@ -87,7 +86,7 @@ public class NoticeController {
                                                                  @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                                                  @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                                                  @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:list");
+        permissionGuard.require(permissions, "notice:list");
         return ApiResponse.success(noticeService.listAdmin(request, requireUserId(userId)), traceId);
     }
 
@@ -96,35 +95,44 @@ public class NoticeController {
                                               @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                               @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                               @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        requirePermission(permissions, "notice:view");
+        permissionGuard.require(permissions, "notice:view");
         return ApiResponse.success(noticeService.getById(id, requireUserId(userId), true), traceId);
     }
 
     @GetMapping("/public")
     public ApiResponse<NoticePageVO<NoticeListItemVO>> publicList(
+            @Valid NoticeQueryRequest request,
             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        return ApiResponse.success(noticeService.listPublished(null, requireUserId(userId)), traceId);
+        permissionGuard.require(permissions, "notice:read");
+        return ApiResponse.success(noticeService.listPublished(request, requireUserId(userId)), traceId);
     }
 
     @GetMapping("/public/{id}")
     public ApiResponse<NoticeDetailVO> publicDetail(@PathVariable Long id,
                                                     @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+                                                    @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                                     @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:read");
         return ApiResponse.success(noticeService.getById(id, requireUserId(userId), false), traceId);
     }
 
     @PostMapping("/{id}/read")
     public ApiResponse<NoticeDetailVO> read(@PathVariable Long id,
                                             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+                                            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
                                             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:read");
         return ApiResponse.success(noticeService.read(id, requireUserId(userId)), traceId);
     }
 
     @GetMapping("/public/unread-count")
     public ApiResponse<NoticeUnreadCountVO> unreadCount(
             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:read");
         return ApiResponse.success(noticeService.unreadCount(requireUserId(userId)), traceId);
     }
 
@@ -135,17 +143,4 @@ public class NoticeController {
         return userId;
     }
 
-    private void requirePermission(String permissions, String permission) {
-        if (!hasPermission(permissions, permission)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-    }
-
-    private boolean hasPermission(String permissions, String permission) {
-        if (permissions == null || permissions.isBlank()) {
-            return false;
-        }
-        Set<String> permissionSet = new HashSet<>(Arrays.asList(permissions.split("[,;\\s]+")));
-        return permissionSet.contains(permission);
-    }
 }

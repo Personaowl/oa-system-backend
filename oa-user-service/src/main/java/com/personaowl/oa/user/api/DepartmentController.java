@@ -2,6 +2,7 @@ package com.personaowl.oa.user.api;
 
 import com.personaowl.oa.common.core.api.ApiResponse;
 import com.personaowl.oa.common.core.web.RequestHeaders;
+import com.personaowl.oa.common.web.PermissionGuard;
 import com.personaowl.oa.user.api.dto.DepartmentCreateRequest;
 import com.personaowl.oa.user.api.dto.DepartmentResponse;
 import com.personaowl.oa.user.api.dto.DepartmentUpdateRequest;
@@ -27,14 +28,16 @@ import java.util.List;
 public class DepartmentController {
 
     private final DepartmentService departmentService;
+    private final PermissionGuard permissionGuard;
 
     /**
      * 通过构造方法注入部门业务层。
      *
      * @param departmentService 部门业务层
      */
-    public DepartmentController(DepartmentService departmentService) {
+    public DepartmentController(DepartmentService departmentService, PermissionGuard permissionGuard) {
         this.departmentService = departmentService;
+        this.permissionGuard = permissionGuard;
     }
 
     /**
@@ -48,11 +51,13 @@ public class DepartmentController {
      */
     @GetMapping
     public ApiResponse<List<DepartmentResponse>> listDepartments(
+        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
         @RequestHeader(
             value = RequestHeaders.TRACE_ID,
             required = false
         ) String traceId
     ) {
+        permissionGuard.require(permissions, "sys:dept:list");
         List<DepartmentResponse> departments =
             departmentService.listDepartments();
 
@@ -72,11 +77,13 @@ public class DepartmentController {
     @GetMapping("/{id}")
     public ApiResponse<DepartmentResponse> getDepartment(
         @PathVariable Long id,
+        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
         @RequestHeader(
             value = RequestHeaders.TRACE_ID,
             required = false
         ) String traceId
     ) {
+        permissionGuard.require(permissions, "sys:dept:view");
         DepartmentResponse department =
             departmentService.getDepartment(id);
 
@@ -96,11 +103,13 @@ public class DepartmentController {
     @PostMapping
     public ApiResponse<DepartmentResponse> createDepartment(
         @Valid @RequestBody DepartmentCreateRequest request,
+        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
         @RequestHeader(
             value = RequestHeaders.TRACE_ID,
             required = false
         ) String traceId
     ) {
+        permissionGuard.require(permissions, "sys:dept:create");
         DepartmentResponse department =
             departmentService.createDepartment(request);
 
@@ -122,11 +131,13 @@ public class DepartmentController {
     public ApiResponse<DepartmentResponse> updateDepartment(
         @PathVariable Long id,
         @Valid @RequestBody DepartmentUpdateRequest request,
+        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
         @RequestHeader(
             value = RequestHeaders.TRACE_ID,
             required = false
         ) String traceId
     ) {
+        permissionGuard.require(permissions, "sys:dept:update");
         DepartmentResponse department =
             departmentService.updateDepartment(id, request);
 
@@ -146,11 +157,13 @@ public class DepartmentController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteDepartment(
         @PathVariable Long id,
+        @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
         @RequestHeader(
             value = RequestHeaders.TRACE_ID,
             required = false
         ) String traceId
     ) {
+        permissionGuard.require(permissions, "sys:dept:delete");
         departmentService.deleteDepartment(id);
 
         return ApiResponse.success(null, traceId);

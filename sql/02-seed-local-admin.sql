@@ -21,7 +21,11 @@ ON DUPLICATE KEY UPDATE
     deleted = 0;
 
 INSERT INTO sys_role (id, code, name, status, deleted)
-VALUES (1, 'ADMIN', '系统管理员', 1, 0)
+VALUES
+    (1, 'ADMIN', '系统管理员', 1, 0),
+    (2, 'EMPLOYEE', '普通员工', 1, 0),
+    (3, 'HR', 'HR 人事', 1, 0),
+    (4, 'MANAGER', '部门主管', 1, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), status = 1, deleted = 0;
 
 INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
@@ -37,10 +41,49 @@ VALUES
     (9, 0, 'notice:publish', '发布公告', 'BUTTON', NULL, 0),
     (10, 0, 'notice:offline', '下线公告', 'BUTTON', NULL, 0),
     (11, 0, 'notice:list', '公告列表', 'BUTTON', NULL, 0),
-    (12, 0, 'notice:view', '公告详情', 'BUTTON', NULL, 0)
+    (12, 0, 'notice:view', '公告详情', 'BUTTON', NULL, 0),
+    (13, 0, 'sys:dept:list', '部门列表', 'API', '/api/v1/departments', 0),
+    (14, 0, 'sys:dept:view', '部门详情', 'API', '/api/v1/departments/{id}', 0),
+    (15, 0, 'sys:dept:create', '创建部门', 'API', '/api/v1/departments', 0),
+    (16, 0, 'sys:dept:update', '修改部门', 'API', '/api/v1/departments/{id}', 0),
+    (17, 0, 'sys:dept:delete', '删除部门', 'API', '/api/v1/departments/{id}', 0),
+    (18, 0, 'sys:role:list', '角色列表', 'API', '/api/v1/roles', 0),
+    (19, 0, 'sys:role:view', '角色详情', 'API', '/api/v1/roles/{id}', 0),
+    (20, 0, 'sys:role:create', '创建角色', 'API', '/api/v1/roles', 0),
+    (21, 0, 'sys:role:update', '修改角色', 'API', '/api/v1/roles/{id}', 0),
+    (22, 0, 'sys:role:delete', '删除角色', 'API', '/api/v1/roles/{id}', 0),
+    (23, 0, 'sys:role:assign-permission', '分配角色权限', 'API', '/api/v1/roles/{id}/permissions', 0),
+    (24, 0, 'sys:permission:list', '权限列表', 'API', '/api/v1/permissions', 0),
+    (25, 0, 'sys:user:role:list', '用户角色列表', 'API', '/api/v1/users/{id}/roles', 0),
+    (26, 0, 'sys:user:assign-role', '分配用户角色', 'API', '/api/v1/users/{id}/roles', 0),
+    (27, 0, 'ai:chat', 'AI办公助手', 'API', '/api/v1/ai/chat', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 VALUES (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7),
-       (1, 8), (1, 9), (1, 10), (1, 11), (1, 12);
+       (1, 8), (1, 9), (1, 10), (1, 11), (1, 12), (1, 13), (1, 14),
+       (1, 15), (1, 16), (1, 17), (1, 18), (1, 19), (1, 20), (1, 21),
+       (1, 22), (1, 23), (1, 24), (1, 25), (1, 26), (1, 27);
+
+-- Registered users receive the least-privilege employee role by default.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+VALUES (2, 2), (2, 3), (2, 4), (2, 27);
+
+-- HR can maintain organization data and the full notice lifecycle.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+VALUES (3, 1), (3, 2), (3, 3), (3, 4),
+       (3, 6), (3, 7), (3, 8), (3, 9), (3, 10), (3, 11), (3, 12),
+       (3, 13), (3, 14), (3, 15), (3, 16), (3, 17),
+       (3, 18), (3, 19), (3, 24), (3, 25), (3, 26), (3, 27);
+
+-- Department managers receive business read/review permissions only.
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+VALUES (4, 1), (4, 2), (4, 3), (4, 4), (4, 27);
+
+-- Backfill accounts created before default role assignment was introduced.
+INSERT IGNORE INTO sys_user_role (user_id, role_id)
+SELECT u.id, 2
+FROM sys_user u
+LEFT JOIN sys_user_role ur ON ur.user_id = u.id
+WHERE u.deleted = 0 AND ur.user_id IS NULL;

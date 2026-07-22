@@ -24,6 +24,8 @@ import java.util.Set;
 @Service
 public class AuthService {
 
+    private static final String DEFAULT_REGISTERED_ROLE = "EMPLOYEE";
+
     private final SysUserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
@@ -74,7 +76,17 @@ public class AuthService {
         user.setStatus(1);
         user.setDeleted(0);
         userMapper.insert(user);
-        return toCurrentUser(user, Set.of(), Set.of());
+
+        Long roleId = userMapper.findEnabledRoleIdByCode(DEFAULT_REGISTERED_ROLE);
+        if (roleId == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "默认员工角色未初始化");
+        }
+        userMapper.insertUserRole(user.getId(), roleId);
+
+        return toCurrentUser(
+                user,
+                toStableSet(userMapper.findRoleCodes(user.getId())),
+                toStableSet(userMapper.findPermissionCodes(user.getId())));
     }
 
     @Transactional(readOnly = true)
