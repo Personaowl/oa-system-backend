@@ -36,12 +36,13 @@ public class AttendanceStatisticsController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<MonthlyStatisticsResponse> getMonthlyStatistics(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId,
             @Parameter(description = "统计月份，格式 yyyy-MM；不传时使用当前月", example = "2026-07")
             @RequestParam(required = false)
             @DateTimeFormat(pattern = "yyyy-MM") YearMonth month) {
-        OperatorContext operator = OperatorContext.fromHeaders(userId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(userId, roles, permissions, traceId);
         return ApiResponse.success(statisticsService.getMonthlyStatistics(operator, month), traceId);
     }
 
@@ -51,6 +52,7 @@ public class AttendanceStatisticsController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<StatisticsSummaryResponse> getSummary(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId,
             @Parameter(description = "开始日期，必填，格式 yyyy-MM-dd", example = "2026-07-01")
@@ -59,10 +61,12 @@ public class AttendanceStatisticsController {
             @Parameter(description = "结束日期，必填，格式 yyyy-MM-dd", example = "2026-07-31")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @Parameter(description = "预留部门参数，本期不参与数据过滤")
+            @Parameter(description = "指定员工 ID")
+            @RequestParam(required = false) Long targetUserId,
+            @Parameter(description = "指定部门 ID")
             @RequestParam(required = false) Long departmentId) {
-        OperatorContext operator = OperatorContext.fromHeaders(userId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(userId, roles, permissions, traceId);
         return ApiResponse.success(
-                statisticsService.getSummary(operator, startDate, endDate, departmentId), traceId);
+                statisticsService.getSummary(operator, startDate, endDate, targetUserId, departmentId), traceId);
     }
 }

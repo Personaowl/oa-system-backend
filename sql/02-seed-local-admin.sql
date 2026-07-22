@@ -51,20 +51,26 @@ DELETE FROM sys_permission
 WHERE code IN ('attendance:record:query', 'attendance:statistics:query')
   AND id NOT IN (28, 29);
 
+-- Reserve a non-conflicting ID for the approval permission. IDs 30-34 are used by
+-- employee management and attendance rule permissions in the local development seed.
+INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
+VALUES (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0)
+ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
+
 -- Migrate the approval permission created by earlier flow seeds at a conflicting ID.
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
-SELECT rp.role_id, 30
+SELECT rp.role_id, 35
 FROM sys_role_permission rp
 JOIN sys_permission p ON p.id = rp.permission_id
-WHERE p.code = 'flow:task:approve';
+WHERE p.code = 'flow:task:approve' AND p.id <> 35;
 
 DELETE rp
 FROM sys_role_permission rp
 JOIN sys_permission p ON p.id = rp.permission_id
-WHERE p.code = 'flow:task:approve' AND p.id <> 30;
+WHERE p.code = 'flow:task:approve' AND p.id <> 35;
 
 DELETE FROM sys_permission
-WHERE code = 'flow:task:approve' AND id <> 30;
+WHERE code = 'flow:task:approve' AND id <> 35;
 
 INSERT INTO sys_permission (id, parent_id, code, name, type, path, deleted)
 VALUES
@@ -95,9 +101,14 @@ VALUES
     (25, 0, 'sys:user:role:list', '用户角色列表', 'API', '/api/v1/users/{id}/roles', 0),
     (26, 0, 'sys:user:assign-role', '分配用户角色', 'API', '/api/v1/users/{id}/roles', 0),
     (27, 0, 'ai:chat', 'AI办公助手', 'API', '/api/v1/ai/chat', 0),
-    (28, 0, 'attendance:record:query', '查询全员考勤记录', 'BUTTON', NULL, 0),
-    (29, 0, 'attendance:statistics:query', '查询考勤汇总统计', 'BUTTON', NULL, 0),
-    (30, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0)
+    (28, 0, 'attendance:record:query', '查询权限范围内考勤记录', 'BUTTON', NULL, 0),
+    (29, 0, 'attendance:statistics:query', '查询权限范围内考勤统计', 'BUTTON', NULL, 0),
+    (30, 0, 'sys:user:list', '员工列表', 'API', '/api/v1/users', 0),
+    (31, 0, 'sys:user:create', '创建员工', 'API', '/api/v1/users', 0),
+    (32, 0, 'sys:user:update', '修改员工', 'API', '/api/v1/users/{id}', 0),
+    (33, 0, 'sys:user:delete', '删除员工', 'API', '/api/v1/users/{id}', 0),
+    (34, 0, 'attendance:rule:update', '修改考勤规则', 'API', '/api/v1/attendance/rules/current', 0),
+    (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
@@ -122,16 +133,18 @@ WHERE code IN (
     'notice:offline', 'notice:list', 'notice:view',
     'sys:dept:list', 'sys:dept:view', 'sys:dept:create', 'sys:dept:update', 'sys:dept:delete',
     'sys:role:list', 'sys:role:view', 'sys:permission:list',
+    'sys:user:list', 'sys:user:create', 'sys:user:update', 'sys:user:delete',
     'sys:user:role:list', 'sys:user:assign-role', 'ai:chat',
     'attendance:record:query', 'attendance:statistics:query'
 );
 
--- Department managers receive business read/review permissions only.
+-- Department managers can query attendance only for departments where they are configured as manager_id.
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 4, id
 FROM sys_permission
 WHERE code IN (
     'user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat',
+    'attendance:record:query', 'attendance:statistics:query',
     'flow:task:approve'
 );
 

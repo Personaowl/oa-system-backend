@@ -26,6 +26,7 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
             SELECT id,
                    parent_id,
                    name,
+                   manager_id,
                    sort_order,
                    status,
                    created_at,
@@ -44,6 +45,7 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
             SELECT id,
                    parent_id,
                    name,
+                   manager_id,
                    sort_order,
                    status,
                    created_at,
@@ -111,6 +113,18 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
               AND deleted = 0
             """)
     long countUsers(@Param("departmentId") Long departmentId);
+
+    @Select("SELECT COUNT(*) FROM sys_user WHERE id = #{userId} AND deleted = 0 AND status = 1")
+    long countEnabledManagerCandidate(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT u.display_name
+            FROM sys_department d
+            JOIN sys_user u ON u.id = d.manager_id
+            WHERE d.id = #{departmentId} AND d.deleted = 0
+              AND u.deleted = 0 AND u.status = 1
+            """)
+    List<String> findManagerNames(@Param("departmentId") Long departmentId);
 
     /**
      * 逻辑删除部门。

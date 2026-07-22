@@ -40,9 +40,10 @@ public class AttendanceController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<CheckInResponse> checkIn(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        OperatorContext operator = OperatorContext.fromHeaders(userId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(userId, roles, permissions, traceId);
         return ApiResponse.success(attendanceService.checkIn(operator), traceId);
     }
 
@@ -51,9 +52,10 @@ public class AttendanceController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<CheckOutResponse> checkOut(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        OperatorContext operator = OperatorContext.fromHeaders(userId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(userId, roles, permissions, traceId);
         return ApiResponse.success(attendanceService.checkOut(operator), traceId);
     }
 
@@ -62,9 +64,10 @@ public class AttendanceController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<TodayStatusResponse> getTodayStatus(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String userId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
-        OperatorContext operator = OperatorContext.fromHeaders(userId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(userId, roles, permissions, traceId);
         return ApiResponse.success(attendanceService.getTodayStatus(operator), traceId);
     }
 
@@ -74,6 +77,7 @@ public class AttendanceController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ApiResponse<AttendanceRecordPageResponse> getRecords(
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.USER_ID, required = false) String operatorUserId,
+            @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @Parameter(hidden = true) @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId,
             @Parameter(description = "开始日期，格式 yyyy-MM-dd", example = "2026-07-01")
@@ -90,9 +94,9 @@ public class AttendanceController {
             @RequestParam(defaultValue = "20") int size,
             @Parameter(description = "管理员指定用户 ID；普通员工只能传本人 ID")
             @RequestParam(required = false) Long userId,
-            @Parameter(description = "预留部门参数，本期不参与数据过滤")
+            @Parameter(description = "部门 ID；管理员可选任意部门，主管仅可选本人负责部门")
             @RequestParam(required = false) Long departmentId) {
-        OperatorContext operator = OperatorContext.fromHeaders(operatorUserId, permissions, traceId);
+        OperatorContext operator = OperatorContext.fromHeaders(operatorUserId, roles, permissions, traceId);
         AttendanceRecordQuery query = new AttendanceRecordQuery(
                 startDate, endDate, status, page, size, userId, departmentId);
         return ApiResponse.success(attendanceService.getRecords(operator, query), traceId);

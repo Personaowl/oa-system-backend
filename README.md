@@ -20,7 +20,7 @@ Shared libraries are under `oa-common`. Business modules may depend on common mo
 - JDK 21
 - Maven 3.9+
 - MySQL 8
-- Nacos 3.2.2 (`127.0.0.1:8848`)
+- Nacos 3.2.2 (`127.0.0.1:8848`，gRPC `9848/9849`)
 - Redis 8 (`127.0.0.1:6379`)
 - Elasticsearch 8.18.1 (`127.0.0.1:9200`)
 - Ollama (`127.0.0.1:12434`) for the AI service

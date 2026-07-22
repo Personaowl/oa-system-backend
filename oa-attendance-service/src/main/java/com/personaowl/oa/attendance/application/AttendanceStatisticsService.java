@@ -5,6 +5,7 @@ import com.personaowl.oa.attendance.api.dto.StatisticsSummaryResponse;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRecordMapper;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceStatisticsAggregate;
 import com.personaowl.oa.attendance.support.AttendanceAuthorizationService;
+import com.personaowl.oa.attendance.support.AttendanceAuthorizationService.RecordQueryScope;
 import com.personaowl.oa.attendance.support.OperatorContext;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
@@ -43,7 +44,7 @@ public class AttendanceStatisticsService {
         LocalDate startDate = month.atDay(1);
         LocalDate endDate = month.atEndOfMonth();
         AttendanceStatisticsAggregate aggregate = aggregate(
-                operator.userId(), startDate, endDate, LocalDate.now(clock));
+                operator.userId(), startDate, endDate, LocalDate.now(clock), null);
 
         log.info("attendance.statistics.monthly traceId={} userId={} month={} totalRecords={} durationMs={}",
                 operator.traceId(), operator.userId(), month, aggregate.getTotalRecords(), elapsedMillis(startedAt));
@@ -63,12 +64,14 @@ public class AttendanceStatisticsService {
     public StatisticsSummaryResponse getSummary(OperatorContext operator,
                                                 LocalDate startDate,
                                                 LocalDate endDate,
+                                                Long requestedUserId,
                                                 Long departmentId) {
         long startedAt = System.nanoTime();
-        authorizationService.requireStatisticsQuery(operator);
-        validateSummaryRange(startDate, endDate, departmentId);
+        validateSummaryRange(startDate, endDate, requestedUserId, departmentId);
+        RecordQueryScope scope = authorizationService.resolveStatisticsScope(
+                operator, requestedUserId, departmentId);
         AttendanceStatisticsAggregate aggregate = aggregate(
-                null, startDate, endDate, LocalDate.now(clock));
+                scope.targetUserId(), startDate, endDate, LocalDate.now(clock), scope.departmentIds());
 
         log.info("attendance.statistics.summary traceId={} operatorId={} startDate={} endDate={} "
                         + "departmentId={} totalRecords={} totalUsers={} durationMs={}",
@@ -78,10 +81,8 @@ public class AttendanceStatisticsService {
                 startDate,
                 endDate,
                 departmentId,
-                false,
-                departmentId == null
-                        ? "查询全部用户统计"
-                        : "departmentId 本期仅预留，未参与数据过滤",
+                scope.departmentFilterApplied(),
+                scope.scopeNote(),
                 aggregate.getTotalRecords(),
                 aggregate.getTotalUsers(),
                 aggregate.getNormalCount(),
@@ -90,12 +91,21 @@ public class AttendanceStatisticsService {
                 aggregate.getMissingCheckOutCount());
     }
 
+    public StatisticsSummaryResponse getSummary(OperatorContext operator,
+                                                LocalDate startDate,
+                                                LocalDate endDate,
+                                                Long departmentId) {
+        return getSummary(operator, startDate, endDate, null, departmentId);
+    }
+
     private AttendanceStatisticsAggregate aggregate(Long userId,
                                                     LocalDate startDate,
                                                     LocalDate endDate,
-                                                    LocalDate today) {
-        AttendanceStatisticsAggregate aggregate = recordMapper.aggregateStatistics(
-                userId, startDate, endDate, today);
+                                                    LocalDate today,
+                                                    java.util.List<Long> departmentIds) {
+        AttendanceStatisticsAggregate aggregate = departmentIds == null || departmentIds.isEmpty()
+                ? recordMapper.aggregateStatistics(userId, startDate, endDate, today)
+                : recordMapper.aggregateStatistics(userId, startDate, endDate, today, departmentIds);
         return aggregate == null ? new AttendanceStatisticsAggregate() : aggregate;
     }
 
@@ -105,7 +115,10 @@ public class AttendanceStatisticsService {
         }
     }
 
-    private void validateSummaryRange(LocalDate startDate, LocalDate endDate, Long departmentId) {
+    private void validateSummaryRange(LocalDate startDate,
+                                      LocalDate endDate,
+                                      Long requestedUserId,
+                                      Long departmentId) {
         if (startDate == null || endDate == null) {
             throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "startDate 和 endDate 不能为空");
         }
@@ -117,6 +130,9 @@ public class AttendanceStatisticsService {
         }
         if (departmentId != null && departmentId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "departmentId 必须为正整数");
+        }
+        if (requestedUserId != null && requestedUserId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "targetUserId 必须为正整数");
         }
     }
 

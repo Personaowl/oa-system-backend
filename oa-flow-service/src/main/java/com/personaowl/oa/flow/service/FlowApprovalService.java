@@ -10,8 +10,10 @@ import com.personaowl.oa.flow.domain.enums.FlowDecision;
 import com.personaowl.oa.flow.domain.enums.FlowRequestStatus;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
+import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
 import com.personaowl.oa.flow.mapper.FlowActionLogMapper;
 import com.personaowl.oa.flow.mapper.FlowRequestMapper;
+import com.personaowl.oa.flow.mapper.FlowUserDirectoryMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,15 @@ import java.util.Locale;
 public class FlowApprovalService {
     private final FlowRequestMapper requestMapper;
     private final FlowActionLogMapper actionLogMapper;
+    private final FlowUserDirectoryMapper userDirectoryMapper;
 
-    public FlowApprovalService(FlowRequestMapper requestMapper, FlowActionLogMapper actionLogMapper) {
+    public FlowApprovalService(
+            FlowRequestMapper requestMapper,
+            FlowActionLogMapper actionLogMapper,
+            FlowUserDirectoryMapper userDirectoryMapper) {
         this.requestMapper = requestMapper;
         this.actionLogMapper = actionLogMapper;
+        this.userDirectoryMapper = userDirectoryMapper;
     }
 
     @Transactional
@@ -53,7 +60,12 @@ public class FlowApprovalService {
         if (requestMapper.insert(entity) != 1) {
             throw new IllegalStateException("创建审批申请失败");
         }
-        return FlowRequestResponse.from(entity, null);
+        return toResponse(entity, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FlowApproverResponse> listApprovers(Long currentUserId) {
+        return userDirectoryMapper.findAvailableApprovers(requireUserId(currentUserId));
     }
 
     @Transactional(readOnly = true)
@@ -81,7 +93,7 @@ public class FlowApprovalService {
         if (!related) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
-        return FlowRequestResponse.from(request, actionLogMapper.findLatest(requestId));
+        return toResponse(request, actionLogMapper.findLatest(requestId));
     }
 
     @Transactional
@@ -121,14 +133,26 @@ public class FlowApprovalService {
         request.setStatus(newStatus);
         request.setCurrentApproverId(null);
         request.setUpdatedAt(now);
-        return FlowRequestResponse.from(request, action);
+        return toResponse(request, action);
     }
 
     private List<FlowRequestResponse> toResponses(List<FlowRequest> requests) {
         return requests.stream()
-                .map(request -> FlowRequestResponse.from(
-                        request, actionLogMapper.findLatest(request.getId())))
+                .map(request -> toResponse(request, actionLogMapper.findLatest(request.getId())))
                 .toList();
+    }
+
+    private FlowRequestResponse toResponse(FlowRequest request, FlowActionLog action) {
+        return FlowRequestResponse.from(
+                request,
+                action,
+                findDisplayName(request.getApplicantId()),
+                findDisplayName(request.getCurrentApproverId()),
+                action == null ? null : findDisplayName(action.getOperatorId()));
+    }
+
+    private String findDisplayName(Long userId) {
+        return userId == null ? null : userDirectoryMapper.findDisplayName(userId);
     }
 
     private FlowRequest requireRequest(Long requestId) {

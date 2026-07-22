@@ -27,6 +27,10 @@ public record DepartmentUpdateRequest(
     @Size(max = 64, message = "部门名称长度不能超过64个字符")
     String name,
 
+    /** 可选的部门负责人用户 ID。 */
+    @Min(value = 1, message = "负责人ID必须是正整数")
+    Long managerId,
+
     /**
      * 排序号，数值越小越靠前。
      */
@@ -42,4 +46,7 @@ public record DepartmentUpdateRequest(
     @Max(value = 1, message = "部门状态只能为0或1")
     Integer status
 ) {
+    public DepartmentUpdateRequest(Long parentId, String name, Integer sortOrder, Integer status) {
+        this(parentId, name, null, sortOrder, status);
+    }
 }

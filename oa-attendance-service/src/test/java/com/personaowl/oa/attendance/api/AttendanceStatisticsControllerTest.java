@@ -73,10 +73,10 @@ class AttendanceStatisticsControllerTest {
 
     @Test
     void returnsAuthorizedAdministrativeSummary() throws Exception {
-        when(statisticsService.getSummary(any(), any(), any(), anyLong()))
+        when(statisticsService.getSummary(any(), any(), any(), any(), anyLong()))
                 .thenReturn(new StatisticsSummaryResponse(
                         LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31),
-                        10L, false, "departmentId 本期仅预留，未参与数据过滤",
+                        10L, true, "查询指定部门考勤",
                         8, 4, 2, 3, 2, 1));
 
         mockMvc.perform(get("/api/v1/attendance/statistics/summary")
@@ -89,14 +89,14 @@ class AttendanceStatisticsControllerTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.totalRecords").value(8))
                 .andExpect(jsonPath("$.data.totalUsers").value(4))
-                .andExpect(jsonPath("$.data.departmentFilterApplied").value(false))
+                .andExpect(jsonPath("$.data.departmentFilterApplied").value(true))
                 .andExpect(jsonPath("$.data.scopeNote")
-                        .value("departmentId 本期仅预留，未参与数据过滤"));
+                        .value("查询指定部门考勤"));
     }
 
     @Test
     void returnsForbiddenWhenSummaryPermissionIsMissing() throws Exception {
-        when(statisticsService.getSummary(any(), any(), any(), any()))
+        when(statisticsService.getSummary(any(), any(), any(), any(), any()))
                 .thenThrow(new BusinessException(ErrorCode.FORBIDDEN));
 
         mockMvc.perform(get("/api/v1/attendance/statistics/summary")

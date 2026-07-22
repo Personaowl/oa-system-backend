@@ -43,7 +43,7 @@ public class DepartmentService {
     public List<DepartmentResponse> listDepartments() {
         return departmentMapper.findAllAvailable()
             .stream()
-            .map(DepartmentResponse::from)
+            .map(this::toResponse)
             .toList();
     }
 
@@ -56,7 +56,7 @@ public class DepartmentService {
     @Transactional(readOnly = true)
     public DepartmentResponse getDepartment(Long id) {
         SysDepartment department = requireDepartment(id);
-        return DepartmentResponse.from(department);
+        return toResponse(department);
     }
 
     /**
@@ -80,6 +80,7 @@ public class DepartmentService {
         String name = normalizeName(request.name());
         Integer sortOrder = normalizeSortOrder(request.sortOrder());
         Integer status = normalizeStatus(request.status());
+        Long managerId = normalizeManagerId(request.managerId());
 
         /*
          * 非根部门必须拥有一个真实存在的父部门。
@@ -108,6 +109,7 @@ public class DepartmentService {
         SysDepartment department = new SysDepartment();
         department.setParentId(parentId);
         department.setName(name);
+        department.setManagerId(managerId);
         department.setSortOrder(sortOrder);
         department.setStatus(status);
         department.setCreatedAt(now);
@@ -126,7 +128,7 @@ public class DepartmentService {
             throw new IllegalStateException("创建部门失败");
         }
 
-        return DepartmentResponse.from(department);
+        return toResponse(department);
     }
 
 
@@ -158,6 +160,7 @@ public class DepartmentService {
         String name = normalizeName(request.name());
         Integer sortOrder = normalizeSortOrder(request.sortOrder());
         Integer status = normalizeStatus(request.status());
+        Long managerId = normalizeManagerId(request.managerId());
 
         /*
          * 检查新的父部门是否合法。
@@ -189,6 +192,7 @@ public class DepartmentService {
 
         department.setParentId(parentId);
         department.setName(name);
+        department.setManagerId(managerId);
         department.setSortOrder(sortOrder);
         department.setStatus(status);
         department.setUpdatedAt(LocalDateTime.now());
@@ -199,7 +203,7 @@ public class DepartmentService {
             throw new IllegalStateException("更新部门失败");
         }
 
-        return DepartmentResponse.from(department);
+        return toResponse(department);
     }
 
 
@@ -284,6 +288,13 @@ public class DepartmentService {
         }
 
         return department;
+    }
+
+    private DepartmentResponse toResponse(SysDepartment department) {
+        return DepartmentResponse.from(
+                department,
+                departmentMapper.countUsers(department.getId()),
+                departmentMapper.findManagerNames(department.getId()));
     }
 
 
@@ -412,6 +423,19 @@ public class DepartmentService {
         }
 
         return sortOrder;
+    }
+
+    private Long normalizeManagerId(Long managerId) {
+        if (managerId == null) {
+            return null;
+        }
+        if (managerId <= 0 || departmentMapper.countEnabledManagerCandidate(managerId) == 0) {
+            throw new BusinessException(
+                ErrorCode.BUSINESS_RULE_VIOLATION,
+                "指定的部门负责人不存在或未启用"
+            );
+        }
+        return managerId;
     }
 
     /**

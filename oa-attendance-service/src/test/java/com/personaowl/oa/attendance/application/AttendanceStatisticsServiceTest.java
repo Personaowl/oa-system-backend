@@ -75,15 +75,16 @@ class AttendanceStatisticsServiceTest {
                 null,
                 LocalDate.of(2026, 7, 1),
                 LocalDate.of(2026, 7, 31),
-                LocalDate.of(2026, 7, 22)))
+                LocalDate.of(2026, 7, 22),
+                java.util.List.of(10L)))
                 .thenReturn(aggregate);
 
         StatisticsSummaryResponse response = service.getSummary(
                 ADMIN, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), 10L);
 
         assertEquals(10L, response.departmentId());
-        assertFalse(response.departmentFilterApplied());
-        assertEquals("departmentId 本期仅预留，未参与数据过滤", response.scopeNote());
+        org.junit.jupiter.api.Assertions.assertTrue(response.departmentFilterApplied());
+        assertEquals("查询指定部门考勤", response.scopeNote());
         assertEquals(8, response.totalRecords());
         assertEquals(4, response.totalUsers());
     }

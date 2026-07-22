@@ -10,6 +10,7 @@ import com.personaowl.oa.flow.domain.enums.FlowRequestStatus;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.mapper.FlowActionLogMapper;
 import com.personaowl.oa.flow.mapper.FlowRequestMapper;
+import com.personaowl.oa.flow.mapper.FlowUserDirectoryMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,13 +32,15 @@ class FlowApprovalServiceTest {
     private FlowRequestMapper requestMapper;
     @Mock
     private FlowActionLogMapper actionLogMapper;
+    @Mock
+    private FlowUserDirectoryMapper userDirectoryMapper;
 
     private FlowApprovalService service;
     private LocalDateTime startTime;
 
     @BeforeEach
     void setUp() {
-        service = new FlowApprovalService(requestMapper, actionLogMapper);
+        service = new FlowApprovalService(requestMapper, actionLogMapper, userDirectoryMapper);
         startTime = LocalDateTime.of(2026, 7, 23, 9, 0);
     }
 

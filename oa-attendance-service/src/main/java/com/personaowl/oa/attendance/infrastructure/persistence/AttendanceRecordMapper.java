@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.util.List;
 
 @Mapper
 public interface AttendanceRecordMapper extends BaseMapper<AttendanceRecordEntity> {
@@ -32,5 +33,13 @@ public interface AttendanceRecordMapper extends BaseMapper<AttendanceRecordEntit
     AttendanceStatisticsAggregate aggregateStatistics(@Param("userId") Long userId,
                                                        @Param("startDate") LocalDate startDate,
                                                        @Param("endDate") LocalDate endDate,
-                                                       @Param("today") LocalDate today);
+                                                       @Param("today") LocalDate today,
+                                                       @Param("departmentIds") List<Long> departmentIds);
+
+    default AttendanceStatisticsAggregate aggregateStatistics(Long userId,
+                                                               LocalDate startDate,
+                                                               LocalDate endDate,
+                                                               LocalDate today) {
+        return aggregateStatistics(userId, startDate, endDate, today, null);
+    }
 }

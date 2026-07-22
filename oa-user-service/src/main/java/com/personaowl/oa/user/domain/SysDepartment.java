@@ -35,6 +35,12 @@ public class SysDepartment {
     private String name;
 
     /**
+     * 部门负责人用户 ID。负责人属于组织关系，不与 RBAC 角色强绑定。
+     */
+    @TableField("manager_id")
+    private Long managerId;
+
+    /**
      * 排序号，数值越小越靠前。
      */
     @TableField("sort_order")
@@ -89,6 +95,14 @@ public class SysDepartment {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Long getManagerId() {
+        return managerId;
+    }
+
+    public void setManagerId(Long managerId) {
+        this.managerId = managerId;
     }
 
     public Integer getSortOrder() {

@@ -1,16 +1,21 @@
 package com.personaowl.oa.attendance.support;
 
 import com.personaowl.oa.attendance.support.AttendanceAuthorizationService.RecordQueryScope;
+import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceScopeMapper;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AttendanceAuthorizationServiceTest {
 
@@ -65,15 +70,36 @@ class AttendanceAuthorizationServiceTest {
     }
 
     @Test
-    void explainsThatAuthorizedDepartmentFilterIsReserved() {
+    void appliesAuthorizedDepartmentFilter() {
         OperatorContext operator = new OperatorContext(
                 90001L, Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION), "trace-admin");
 
         RecordQueryScope scope = service.resolveRecordQueryScope(operator, null, 10L);
 
-        assertEquals("ALL_USERS", scope.dataScope());
-        assertFalse(scope.departmentFilterApplied());
-        assertEquals("departmentId 本期仅预留，未参与数据过滤", scope.scopeNote());
+        assertEquals("DEPARTMENT", scope.dataScope());
+        assertTrue(scope.departmentFilterApplied());
+        assertEquals(List.of(10L), scope.departmentIds());
+        assertEquals("查询指定部门考勤", scope.scopeNote());
+    }
+
+    @Test
+    void limitsManagerToManagedDepartmentsAndRejectsOtherDepartment() {
+        AttendanceScopeMapper mapper = mock(AttendanceScopeMapper.class);
+        AttendanceAuthorizationService scopedService = new AttendanceAuthorizationService(mapper);
+        OperatorContext manager = new OperatorContext(
+                20001L,
+                Set.of("MANAGER"),
+                Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION),
+                "trace-manager");
+        when(mapper.findManagedDepartmentIds(20001L)).thenReturn(List.of(10L));
+
+        RecordQueryScope scope = scopedService.resolveRecordQueryScope(manager, null, 10L);
+        assertEquals("DEPARTMENT", scope.dataScope());
+        assertEquals(List.of(10L), scope.departmentIds());
+
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> scopedService.resolveRecordQueryScope(manager, null, 11L));
+        assertEquals(ErrorCode.FORBIDDEN, exception.errorCode());
     }
 
     @Test

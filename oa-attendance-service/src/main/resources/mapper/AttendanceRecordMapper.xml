@@ -28,6 +28,15 @@
         <if test="userId != null">
             AND user_id = #{userId}
         </if>
+        <if test="departmentIds != null and !departmentIds.isEmpty()">
+            AND user_id IN (
+            SELECT id FROM sys_user
+            WHERE status = 1 AND deleted = 0 AND department_id IN
+            <foreach collection="departmentIds" item="departmentId" open="(" separator="," close=")">
+                #{departmentId}
+            </foreach>
+            )
+        </if>
     </select>
 
 </mapper>

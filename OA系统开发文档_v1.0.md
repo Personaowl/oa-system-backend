@@ -430,7 +430,7 @@ JWT 密钥、Nacos 配置和 .env 的安全管理方式。
 | 组件 | 地址/端口 | 当前状态/备注 |
 | --- | --- | --- |
 | Gateway | http://localhost:8080 | 项目后续启动 |
-| Nacos API | localhost:8848/nacos | Docker 已配置 |
+| Nacos API | localhost:8848/nacos | Docker 已配置；gRPC 使用 9848/9849 |
 | Nacos Console | http://localhost:8849 | 本地开发关闭认证 |
 | MySQL | localhost:3306 | MySQL80 服务 |
 | Redis | localhost:6379 | Redis 8.2.7，含向量检索 |

@@ -10,6 +10,7 @@ Run these SQL files in numeric order:
 2. `sql/01-initial-schema.sql`
 3. `sql/02-seed-local-admin.sql`
 4. `sql/03-attendance-migration.sql`
+5. `sql/05-attendance-rule.sql`
 
 `02-seed-local-admin.sql` is idempotent and may be run again after the migration. It grants the local admin the record-query and statistics-query permissions used by this service.
 
@@ -39,6 +40,10 @@ The canonical Nacos Data ID is `oa-attendance-service.yaml` in group `DEFAULT_GR
 
 Keep this table synchronized with `deploy/nacos/oa-attendance-service.yaml` and `AttendanceProperties`.
 
+The values above are startup fallbacks. The active rule is persisted in the single-row
+`attendance_rule` table and can be changed by an administrator through the rule API.
+Existing attendance records retain the rule snapshot captured at check-in time.
+
 ## HTTP API
 
 | Method and path | Purpose | Permission |
@@ -46,9 +51,12 @@ Keep this table synchronized with `deploy/nacos/oa-attendance-service.yaml` and 
 | `POST /api/v1/attendance/check-in` | Check in current employee | Authenticated |
 | `POST /api/v1/attendance/check-out` | Check out current employee | Authenticated |
 | `GET /api/v1/attendance/today` | Current employee today status | Authenticated |
-| `GET /api/v1/attendance/records` | Personal or scoped records | Cross-user: `attendance:record:query` |
+| `GET /api/v1/attendance/records` | Personal or scoped records with employee/department data | Cross-user: `attendance:record:query` |
+| `GET /api/v1/attendance/scope` | Visible departments and employee filter options | Authenticated; server-side data scope |
 | `GET /api/v1/attendance/statistics/monthly` | Personal monthly statistics | Authenticated |
-| `GET /api/v1/attendance/statistics/summary` | Administrative summary | `attendance:statistics:query` |
+| `GET /api/v1/attendance/statistics/summary` | Admin/HR all-data or manager department summary | `attendance:statistics:query` |
+| `GET /api/v1/attendance/rules/current` | Read active attendance rule | Authenticated |
+| `PUT /api/v1/attendance/rules/current` | Update active attendance rule | `attendance:rule:update` |
 | `GET /api/v1/attendance/openapi` | OpenAPI 3 JSON | Gateway-authenticated or direct development access |
 
 `GET /api/v1/attendance/status` remains temporarily for compatibility and is deprecated. Use `GET /actuator/health` for service health.

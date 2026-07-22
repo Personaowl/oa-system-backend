@@ -34,3 +34,10 @@ FROM (
 ) account_role
 JOIN sys_user u ON u.username = account_role.username
 JOIN sys_role r ON r.code = account_role.role_code AND r.status = 1 AND r.deleted = 0;
+
+-- Give the local manager account a real department data scope without overwriting
+-- a manager explicitly configured later through the organization page.
+UPDATE sys_department d
+JOIN sys_user u ON u.department_id = d.id AND u.username = 'mty-manager'
+SET d.manager_id = u.id
+WHERE d.deleted = 0 AND d.manager_id IS NULL;

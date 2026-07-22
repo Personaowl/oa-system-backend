@@ -3,6 +3,7 @@ package com.personaowl.oa.user.api.dto;
 import com.personaowl.oa.user.domain.SysDepartment;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 部门接口响应对象。
@@ -48,7 +49,11 @@ public record DepartmentResponse(
     /**
      * 最后更新时间。
      */
-    LocalDateTime updatedAt
+    LocalDateTime updatedAt,
+
+    long employeeCount,
+
+    List<String> managerNames
 ) {
 
     /**
@@ -65,7 +70,16 @@ public record DepartmentResponse(
             department.getSortOrder(),
             department.getStatus(),
             department.getCreatedAt(),
-            department.getUpdatedAt()
+            department.getUpdatedAt(),
+            0,
+            List.of()
         );
+    }
+
+    public static DepartmentResponse from(SysDepartment department, long employeeCount, List<String> managerNames) {
+        return new DepartmentResponse(
+                department.getId(), department.getParentId(), department.getName(), department.getSortOrder(),
+                department.getStatus(), department.getCreatedAt(), department.getUpdatedAt(),
+                employeeCount, managerNames == null ? List.of() : List.copyOf(managerNames));
     }
 }

@@ -8,6 +8,7 @@ import com.personaowl.oa.flow.domain.dto.FlowApprovalRequest;
 import com.personaowl.oa.flow.domain.dto.FlowSubmitRequest;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
+import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
 import com.personaowl.oa.flow.service.FlowApprovalService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,6 +57,13 @@ public class FlowApprovalController {
             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         return ApiResponse.success(flowApprovalService.listMine(userId), traceId);
+    }
+
+    @GetMapping("/approvers")
+    public ApiResponse<List<FlowApproverResponse>> approvers(
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        return ApiResponse.success(flowApprovalService.listApprovers(userId), traceId);
     }
 
     @GetMapping("/requests/{id}")

@@ -22,6 +22,10 @@ Authorization: Bearer <accessToken>
 | GET | `/api/v1/permissions` | `sys:permission:list` |
 | GET | `/api/v1/users/{id}/roles` | `sys:user:role:list` |
 | PUT | `/api/v1/users/{id}/roles` | `sys:user:assign-role` |
+| GET | `/api/v1/users` | `sys:user:list` |
+| POST | `/api/v1/users` | `sys:user:create` |
+| PUT | `/api/v1/users/{id}` | `sys:user:update` |
+| DELETE | `/api/v1/users/{id}` | `sys:user:delete` |
 
 创建角色：
 
@@ -42,6 +46,9 @@ Authorization: Bearer <accessToken>
 ```
 
 分配接口采用“整体替换”语义，传入空数组表示清空当前关联。
+
+员工管理接口使用登录账号作为工号。创建员工时必须提供初始密码和至少一个角色；编辑时
+`newPassword` 留空表示不修改密码。删除采用逻辑删除，且不能删除当前登录账号。
 
 ## 已接入业务权限
 

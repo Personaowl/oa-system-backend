@@ -17,6 +17,8 @@ import com.personaowl.oa.attendance.domain.CheckResult;
 import com.personaowl.oa.attendance.domain.RuleSnapshot;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRecordEntity;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRecordMapper;
+import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceScopeMapper;
+import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceUserDirectoryEntry;
 import com.personaowl.oa.attendance.infrastructure.redis.AttendanceLockService;
 import com.personaowl.oa.attendance.infrastructure.redis.AttendanceLockService.LockHandle;
 import com.personaowl.oa.attendance.support.AttendanceAuthorizationService;
@@ -26,6 +28,7 @@ import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +40,10 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class AttendanceApplicationService {
@@ -51,6 +57,29 @@ public class AttendanceApplicationService {
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
     private final AttendanceAuthorizationService authorizationService;
+    private final AttendanceScopeMapper scopeMapper;
+    private final AttendanceRuleService ruleService;
+
+    @Autowired
+    public AttendanceApplicationService(AttendanceRecordMapper recordMapper,
+                                        AttendanceLockService lockService,
+                                        AttendanceProperties properties,
+                                        AttendanceRuleCalculator ruleCalculator,
+                                        Clock clock,
+                                        TransactionTemplate transactionTemplate,
+                                        AttendanceAuthorizationService authorizationService,
+                                        AttendanceScopeMapper scopeMapper,
+                                        AttendanceRuleService ruleService) {
+        this.recordMapper = recordMapper;
+        this.lockService = lockService;
+        this.properties = properties;
+        this.ruleCalculator = ruleCalculator;
+        this.clock = clock;
+        this.transactionTemplate = transactionTemplate;
+        this.authorizationService = authorizationService;
+        this.scopeMapper = scopeMapper;
+        this.ruleService = ruleService;
+    }
 
     public AttendanceApplicationService(AttendanceRecordMapper recordMapper,
                                         AttendanceLockService lockService,
@@ -59,20 +88,15 @@ public class AttendanceApplicationService {
                                         Clock clock,
                                         TransactionTemplate transactionTemplate,
                                         AttendanceAuthorizationService authorizationService) {
-        this.recordMapper = recordMapper;
-        this.lockService = lockService;
-        this.properties = properties;
-        this.ruleCalculator = ruleCalculator;
-        this.clock = clock;
-        this.transactionTemplate = transactionTemplate;
-        this.authorizationService = authorizationService;
+        this(recordMapper, lockService, properties, ruleCalculator, clock,
+                transactionTemplate, authorizationService, null, null);
     }
 
     public CheckInResponse checkIn(OperatorContext operator) {
         long startedAt = System.nanoTime();
         LocalDateTime checkInTime = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS);
         LocalDate workDate = checkInTime.toLocalDate();
-        RuleSnapshot snapshot = properties.snapshot();
+        RuleSnapshot snapshot = currentRuleSnapshot();
         LockHandle lock = lockService.acquire(operator.userId(), workDate);
         if (!lock.allowsProceeding()) {
             log.info("attendance.check-in.rejected traceId={} userId={} workDate={} reason=lock-contended",
@@ -166,14 +190,21 @@ public class AttendanceApplicationService {
         wrapper.eq(scope.targetUserId() != null, AttendanceRecordEntity::getUserId, scope.targetUserId())
                 .ge(query.startDate() != null, AttendanceRecordEntity::getWorkDate, query.startDate())
                 .le(query.endDate() != null, AttendanceRecordEntity::getWorkDate, query.endDate());
+        if (!scope.departmentIds().isEmpty()) {
+            wrapper.inSql(AttendanceRecordEntity::getUserId,
+                    "SELECT id FROM sys_user WHERE status = 1 AND deleted = 0 AND department_id IN ("
+                            + scope.departmentIds().stream().map(String::valueOf).collect(Collectors.joining(","))
+                            + ")");
+        }
         applyStatusFilter(wrapper, query.status(), today);
         wrapper.orderByDesc(AttendanceRecordEntity::getWorkDate)
                 .orderByDesc(AttendanceRecordEntity::getId);
 
         IPage<AttendanceRecordEntity> result = recordMapper.selectPage(
                 new Page<>(query.page(), query.size()), wrapper);
+        Map<Long, AttendanceUserDirectoryEntry> users = loadUsers(result.getRecords());
         List<AttendanceRecordItemResponse> items = result.getRecords().stream()
-                .map(record -> toRecordItem(record, today))
+                .map(record -> toRecordItem(record, today, users.get(record.getUserId())))
                 .toList();
 
         log.info("attendance.query.{} traceId={} operatorId={} targetUserId={} departmentId={} "
@@ -288,7 +319,11 @@ public class AttendanceApplicationService {
                     record.getRuleLateThresholdMinutes());
         }
         log.warn("attendance.rule-snapshot.missing recordId={} fallbackUsed=true", record.getId());
-        return properties.snapshot();
+        return currentRuleSnapshot();
+    }
+
+    private RuleSnapshot currentRuleSnapshot() {
+        return ruleService == null ? properties.snapshot() : ruleService.currentSnapshot();
     }
 
     private void validateRecordQuery(AttendanceRecordQuery query) {
@@ -329,7 +364,18 @@ public class AttendanceApplicationService {
         }
     }
 
-    private AttendanceRecordItemResponse toRecordItem(AttendanceRecordEntity record, LocalDate today) {
+    private Map<Long, AttendanceUserDirectoryEntry> loadUsers(List<AttendanceRecordEntity> records) {
+        if (scopeMapper == null || records.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = records.stream().map(AttendanceRecordEntity::getUserId).distinct().toList();
+        return scopeMapper.findUsersByIds(ids).stream().collect(Collectors.toMap(
+                AttendanceUserDirectoryEntry::getId, Function.identity(), (left, right) -> left));
+    }
+
+    private AttendanceRecordItemResponse toRecordItem(AttendanceRecordEntity record,
+                                                       LocalDate today,
+                                                       AttendanceUserDirectoryEntry user) {
         AttendanceStatus status = record.getStatus();
         if (record.getWorkDate() != null
                 && record.getWorkDate().isBefore(today)
@@ -340,6 +386,10 @@ public class AttendanceApplicationService {
         return new AttendanceRecordItemResponse(
                 String.valueOf(record.getId()),
                 String.valueOf(record.getUserId()),
+                user == null ? null : user.getUsername(),
+                user == null ? null : user.getDisplayName(),
+                user == null || user.getDepartmentId() == null ? null : String.valueOf(user.getDepartmentId()),
+                user == null ? null : user.getDepartmentName(),
                 record.getWorkDate(),
                 atOffset(record.getCheckInTime()),
                 atOffset(record.getCheckOutTime()),
