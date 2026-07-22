@@ -3,6 +3,7 @@ package com.personaowl.oa.notice.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
+import com.personaowl.oa.common.redis.CacheNames;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
@@ -18,6 +19,8 @@ import com.personaowl.oa.notice.mapper.NoticeReadMapper;
 import com.personaowl.oa.notice.service.NoticeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -35,6 +38,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, allEntries = true)
     public Notice create(NoticeCreateRequest request, Long publisherId) {
         Notice notice = new Notice();
         notice.setTitle(request.getTitle());
@@ -56,6 +60,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, allEntries = true)
     public Notice update(Long id, NoticeUpdateRequest request, Long operatorId) {
         Notice notice = requireById(id);
         if (NoticeStatus.OFFLINE.name().equals(notice.getStatus())) {
@@ -77,6 +82,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, allEntries = true)
     public Notice delete(Long id, Long operatorId) {
         Notice notice = requireById(id);
         if (NoticeStatus.PUBLISHED.name().equals(notice.getStatus())) {
@@ -91,6 +97,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, allEntries = true)
     public Notice publish(Long id, Long publisherId) {
         Notice notice = requireById(id);
         if (NoticeStatus.PUBLISHED.name().equals(notice.getStatus())) {
@@ -110,6 +117,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, allEntries = true)
     public Notice offline(Long id, Long publisherId) {
         Notice notice = requireById(id);
         if (NoticeStatus.OFFLINE.name().equals(notice.getStatus())) {
@@ -146,6 +154,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, key = "#currentUserId")
     public NoticeDetailVO read(Long id, Long currentUserId) {
         Notice notice = requireById(id);
         if (!NoticeStatus.PUBLISHED.name().equals(notice.getStatus())) {
@@ -167,6 +176,7 @@ public class NoticeServiceImpl implements NoticeService {
     }
 
     @Override
+    @Cacheable(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, key = "#currentUserId", sync = true)
     public NoticeUnreadCountVO unreadCount(Long currentUserId) {
         return new NoticeUnreadCountVO(noticeReadMapper.countUnreadByUser(currentUserId));
     }

@@ -1,5 +1,6 @@
 package com.personaowl.oa.user.api.dto;
 
+import java.math.BigDecimal;
 import java.util.Set;
 
 public record UserResponse(
@@ -10,6 +11,7 @@ public record UserResponse(
         String displayName,
         String phone,
         String email,
+        BigDecimal salary,
         Integer status,
         Set<Long> roleIds,
         Set<String> roleCodes

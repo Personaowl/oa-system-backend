@@ -2,6 +2,7 @@ package com.personaowl.oa.user.service;
 
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
+import com.personaowl.oa.common.redis.CacheNames;
 import com.personaowl.oa.user.api.dto.DepartmentCreateRequest;
 import com.personaowl.oa.user.api.dto.DepartmentUpdateRequest;
 import com.personaowl.oa.user.api.dto.DepartmentResponse;
@@ -9,6 +10,9 @@ import com.personaowl.oa.user.domain.SysDepartment;
 import com.personaowl.oa.user.mapper.SysDepartmentMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -40,6 +44,7 @@ public class DepartmentService {
      * @return 部门响应列表
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.DEPARTMENT_LIST, key = "'all'", sync = true)
     public List<DepartmentResponse> listDepartments() {
         return departmentMapper.findAllAvailable()
             .stream()
@@ -54,6 +59,7 @@ public class DepartmentService {
      * @return 部门响应对象
      */
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.DEPARTMENT_DETAIL, key = "#id", sync = true)
     public DepartmentResponse getDepartment(Long id) {
         SysDepartment department = requireDepartment(id);
         return toResponse(department);
@@ -66,6 +72,10 @@ public class DepartmentService {
      * @return 创建后的部门信息
      */
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_LIST, allEntries = true),
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_DETAIL, allEntries = true)
+    })
     public DepartmentResponse createDepartment(
         DepartmentCreateRequest request
     ) {
@@ -140,6 +150,10 @@ public class DepartmentService {
      * @return 更新后的部门信息
      */
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_LIST, allEntries = true),
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_DETAIL, allEntries = true)
+    })
     public DepartmentResponse updateDepartment(
         Long id,
         DepartmentUpdateRequest request
@@ -218,6 +232,10 @@ public class DepartmentService {
      * @param id 要删除的部门 ID
      */
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_LIST, allEntries = true),
+        @CacheEvict(cacheNames = CacheNames.DEPARTMENT_DETAIL, allEntries = true)
+    })
     public void deleteDepartment(Long id) {
         /*
          * 先检查部门 ID 是否合法，并确认部门存在。

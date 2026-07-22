@@ -17,12 +17,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Set;
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -81,6 +83,53 @@ class UserManagementServiceTest {
         assertThatThrownBy(() -> service.deleteUser(10L, 10L))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.errorCode()).isEqualTo(ErrorCode.BUSINESS_RULE_VIOLATION));
+    }
+
+    @Test
+    void managerListIsAutomaticallyScopedToOwnDepartment() {
+        SysUser manager = user(10L, "manager");
+        SysDepartment department = department();
+        department.setManagerId(10L);
+        when(userMapper.findAvailableById(10L)).thenReturn(manager);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+        when(userMapper.countAvailable(null, 1L)).thenReturn(0L);
+
+        var response = service.listUsers(10L, "MANAGER", null, null, 1, 20);
+
+        assertThat(response.total()).isZero();
+        verify(userMapper).countAvailable(null, 1L);
+    }
+
+    @Test
+    void managerCannotAdjustSalaryOutsideOwnDepartment() {
+        SysUser manager = user(10L, "manager");
+        SysUser target = user(20L, "outside");
+        target.setDepartmentId(2L);
+        SysDepartment department = department();
+        department.setManagerId(10L);
+        when(userMapper.findAvailableById(20L)).thenReturn(target);
+        when(userMapper.findAvailableById(10L)).thenReturn(manager);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+
+        assertThatThrownBy(() -> service.updateSalary(10L, "MANAGER", 20L, new BigDecimal("13000.00")))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        exception -> assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        verify(userMapper, never()).updateSalary(20L, new BigDecimal("13000.00"));
+    }
+
+    @Test
+    void adminCanAdjustSalaryAcrossDepartments() {
+        SysUser target = user(20L, "employee");
+        when(userMapper.findAvailableById(20L)).thenReturn(target);
+        when(userMapper.updateSalary(20L, new BigDecimal("13500.00"))).thenReturn(1);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department());
+        when(userMapper.findRoleIds(20L)).thenReturn(List.of(2L));
+        when(userMapper.findRoleCodes(20L)).thenReturn(List.of("EMPLOYEE"));
+
+        var response = service.updateSalary(1L, "ADMIN", 20L, new BigDecimal("13500"));
+
+        assertThat(response.salary()).isEqualByComparingTo("13500.00");
+        verify(userMapper).updateSalary(20L, new BigDecimal("13500.00"));
     }
 
     private SysDepartment department() {

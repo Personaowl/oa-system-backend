@@ -4,6 +4,7 @@ import com.personaowl.oa.common.core.api.ApiResponse;
 import com.personaowl.oa.common.core.web.RequestHeaders;
 import com.personaowl.oa.common.web.PermissionGuard;
 import com.personaowl.oa.user.api.dto.UserCreateRequest;
+import com.personaowl.oa.user.api.dto.SalaryUpdateRequest;
 import com.personaowl.oa.user.api.dto.UserPageResponse;
 import com.personaowl.oa.user.api.dto.UserResponse;
 import com.personaowl.oa.user.api.dto.UserUpdateRequest;
@@ -37,10 +38,12 @@ public class UserManagementController {
             @RequestParam(required = false) Long departmentId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long operatorId,
+            @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "sys:user:list");
-        return ApiResponse.success(userService.listUsers(keyword, departmentId, page, size), traceId);
+        return ApiResponse.success(userService.listUsers(operatorId, roles, keyword, departmentId, page, size), traceId);
     }
 
     @PostMapping
@@ -71,5 +74,17 @@ public class UserManagementController {
         permissionGuard.require(permissions, "sys:user:delete");
         userService.deleteUser(id, operatorId);
         return ApiResponse.success(null, traceId);
+    }
+
+    @PutMapping("/{id}/salary")
+    public ApiResponse<UserResponse> updateSalary(
+            @PathVariable Long id,
+            @Valid @RequestBody SalaryUpdateRequest request,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long operatorId,
+            @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "sys:salary:update");
+        return ApiResponse.success(userService.updateSalary(operatorId, roles, id, request.salary()), traceId);
     }
 }

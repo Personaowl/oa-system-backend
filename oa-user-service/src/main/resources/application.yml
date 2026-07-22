@@ -23,7 +23,19 @@ spring:
     password: ${MYSQL_PASSWORD:123456}
     hikari:
       initialization-fail-timeout: 0
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 1MB
 oa:
+  storage:
+    avatar:
+      directory: ${OA_AVATAR_DIR:D:/oa-system/data/avatars}
+      max-bytes: 1048576
   security:
     jwt:
       issuer: oa-system

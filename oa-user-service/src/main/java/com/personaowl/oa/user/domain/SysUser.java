@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
+import java.math.BigDecimal;
+
 @TableName("sys_user")
 public class SysUser {
 
@@ -21,8 +23,12 @@ public class SysUser {
     @TableField("display_name")
     private String displayName;
 
+    @TableField("avatar_file_name")
+    private String avatarFileName;
+
     private String phone;
     private String email;
+    private BigDecimal salary;
     private Integer status;
     private Integer deleted;
 
@@ -66,6 +72,14 @@ public class SysUser {
         this.displayName = displayName;
     }
 
+    public String getAvatarFileName() {
+        return avatarFileName;
+    }
+
+    public void setAvatarFileName(String avatarFileName) {
+        this.avatarFileName = avatarFileName;
+    }
+
     public String getPhone() {
         return phone;
     }
@@ -80,6 +94,14 @@ public class SysUser {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public BigDecimal getSalary() {
+        return salary;
+    }
+
+    public void setSalary(BigDecimal salary) {
+        this.salary = salary;
     }
 
     public Integer getStatus() {

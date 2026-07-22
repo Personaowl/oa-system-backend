@@ -3,6 +3,7 @@ package com.personaowl.oa.user.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
+import com.personaowl.oa.common.redis.CacheNames;
 import com.personaowl.oa.user.api.dto.PermissionResponse;
 import com.personaowl.oa.user.api.dto.RoleCreateRequest;
 import com.personaowl.oa.user.api.dto.RoleResponse;
@@ -13,6 +14,9 @@ import com.personaowl.oa.user.mapper.SysRoleMapper;
 import com.personaowl.oa.user.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
@@ -33,16 +37,23 @@ public class RbacService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.RBAC_ROLES, key = "'all'", sync = true)
     public List<RoleResponse> listRoles() {
         return roleMapper.findAllAvailable().stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.RBAC_ROLES, key = "#roleId", sync = true)
     public RoleResponse getRole(Long roleId) {
         return toResponse(requireRole(roleId));
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.RBAC_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_PERMISSIONS, allEntries = true)
+    })
     public RoleResponse createRole(RoleCreateRequest request) {
         String code = normalizeCode(request.code());
         ensureUniqueCode(code, 0L);
@@ -62,6 +73,11 @@ public class RbacService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.RBAC_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_PERMISSIONS, allEntries = true)
+    })
     public RoleResponse updateRole(Long roleId, RoleUpdateRequest request) {
         SysRole role = requireRole(roleId);
         String code = normalizeCode(request.code());
@@ -77,6 +93,11 @@ public class RbacService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.RBAC_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_PERMISSIONS, allEntries = true)
+    })
     public void deleteRole(Long roleId) {
         requireRole(roleId);
         if (roleMapper.countAssignedUsers(roleId) > 0) {
@@ -89,11 +110,16 @@ public class RbacService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = CacheNames.RBAC_PERMISSIONS, key = "'all'", sync = true)
     public List<PermissionResponse> listPermissions() {
         return permissionMapper.findAllAvailable().stream().map(PermissionResponse::from).toList();
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.RBAC_ROLES, allEntries = true),
+            @CacheEvict(cacheNames = CacheNames.USER_PERMISSIONS, allEntries = true)
+    })
     public RoleResponse assignPermissions(Long roleId, Set<Long> requestedIds) {
         SysRole role = requireRole(roleId);
         Set<Long> permissionIds = normalizeIds(requestedIds, "权限ID");
@@ -112,6 +138,10 @@ public class RbacService {
     }
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheNames.USER_ROLES, key = "#userId"),
+            @CacheEvict(cacheNames = CacheNames.USER_PERMISSIONS, key = "#userId")
+    })
     public Set<Long> assignUserRoles(Long userId, Set<Long> requestedIds) {
         requireUser(userId);
         Set<Long> roleIds = normalizeIds(requestedIds, "角色ID");

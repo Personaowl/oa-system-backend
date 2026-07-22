@@ -108,7 +108,9 @@ VALUES
     (32, 0, 'sys:user:update', '修改员工', 'API', '/api/v1/users/{id}', 0),
     (33, 0, 'sys:user:delete', '删除员工', 'API', '/api/v1/users/{id}', 0),
     (34, 0, 'attendance:rule:update', '修改考勤规则', 'API', '/api/v1/attendance/rules/current', 0),
-    (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0)
+    (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0),
+    (36, 0, 'sys:salary:view', '查看员工薪资', 'API', '/api/v1/users', 0),
+    (37, 0, 'sys:salary:update', '调整员工薪资', 'API', '/api/v1/users/{id}/salary', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
@@ -123,7 +125,15 @@ SELECT 2, id
 FROM sys_permission
 WHERE code IN ('attendance:read', 'flow:read', 'notice:read', 'ai:chat');
 
--- HR can maintain organization data and the full notice lifecycle.
+-- HR can view the organization structure and maintain employee records, but department
+-- structure changes remain an administrator responsibility (separation of duties).
+DELETE rp
+FROM sys_role_permission rp
+JOIN sys_role r ON r.id = rp.role_id
+JOIN sys_permission p ON p.id = rp.permission_id
+WHERE r.code = 'HR'
+  AND p.code IN ('sys:dept:create', 'sys:dept:update', 'sys:dept:delete');
+
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 3, id
 FROM sys_permission
@@ -131,9 +141,10 @@ WHERE code IN (
     'user:read', 'attendance:read', 'flow:read', 'notice:read',
     'notice:create', 'notice:update', 'notice:delete', 'notice:publish',
     'notice:offline', 'notice:list', 'notice:view',
-    'sys:dept:list', 'sys:dept:view', 'sys:dept:create', 'sys:dept:update', 'sys:dept:delete',
+    'sys:dept:list', 'sys:dept:view',
     'sys:role:list', 'sys:role:view', 'sys:permission:list',
     'sys:user:list', 'sys:user:create', 'sys:user:update', 'sys:user:delete',
+    'sys:salary:view', 'sys:salary:update',
     'sys:user:role:list', 'sys:user:assign-role', 'ai:chat',
     'attendance:record:query', 'attendance:statistics:query'
 );
@@ -145,7 +156,7 @@ FROM sys_permission
 WHERE code IN (
     'user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat',
     'attendance:record:query', 'attendance:statistics:query',
-    'flow:task:approve'
+    'flow:task:approve', 'sys:user:list', 'sys:salary:view', 'sys:salary:update'
 );
 
 -- Backfill accounts created before default role assignment was introduced.

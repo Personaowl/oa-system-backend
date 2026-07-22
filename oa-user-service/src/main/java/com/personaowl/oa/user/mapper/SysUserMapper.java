@@ -15,7 +15,7 @@ import java.util.List;
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, phone, email, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
             FROM sys_user
             WHERE username = #{username} AND status = 1 AND deleted = 0
             LIMIT 1
@@ -29,7 +29,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     long countByUsernameExcluding(@Param("username") String username, @Param("excludeId") Long excludeId);
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, phone, email, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
             FROM sys_user
             WHERE id = #{userId} AND status = 1 AND deleted = 0
             LIMIT 1
@@ -37,7 +37,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     SysUser findEnabledById(@Param("userId") Long userId);
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, phone, email, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
             FROM sys_user
             WHERE id = #{userId} AND deleted = 0
             LIMIT 1
@@ -74,7 +74,7 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
             <script>
-            SELECT id, department_id, username, password_hash, display_name, phone, email, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
             FROM sys_user
             WHERE deleted = 0
             <if test='keyword != null and keyword != ""'>
@@ -112,4 +112,10 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Update("UPDATE sys_user SET username = CONCAT('deleted_', id), status = 0, deleted = 1 WHERE id = #{userId} AND deleted = 0")
     int softDeleteUser(@Param("userId") Long userId);
+
+    @Update("UPDATE sys_user SET avatar_file_name = #{fileName} WHERE id = #{userId} AND status = 1 AND deleted = 0")
+    int updateAvatarFileName(@Param("userId") Long userId, @Param("fileName") String fileName);
+
+    @Update("UPDATE sys_user SET salary = #{salary}, updated_at = CURRENT_TIMESTAMP WHERE id = #{userId} AND deleted = 0")
+    int updateSalary(@Param("userId") Long userId, @Param("salary") java.math.BigDecimal salary);
 }

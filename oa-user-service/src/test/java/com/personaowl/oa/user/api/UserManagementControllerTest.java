@@ -33,7 +33,7 @@ class UserManagementControllerTest {
 
     @Test
     void listReturnsPageWithPermission() throws Exception {
-        when(userService.listUsers(any(), any(), eq(1), eq(20))).thenReturn(new UserPageResponse(0, List.of()));
+        when(userService.listUsers(any(), any(), any(), any(), eq(1), eq(20))).thenReturn(new UserPageResponse(0, List.of()));
         mockMvc.perform(get("/api/v1/users").header("X-Permissions", "sys:user:list"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(0));
     }

@@ -14,6 +14,7 @@ import com.personaowl.oa.user.api.dto.UpdateAccountRequest;
 import com.personaowl.oa.user.domain.SysUser;
 import com.personaowl.oa.user.mapper.SysUserMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,15 +31,29 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
     private final JwtProperties jwtProperties;
+    private final AuthorizationCacheService authorizationCacheService;
 
+    @Autowired
     public AuthService(SysUserMapper userMapper,
                        PasswordEncoder passwordEncoder,
                        JwtTokenService jwtTokenService,
-                       JwtProperties jwtProperties) {
+                       JwtProperties jwtProperties,
+                       AuthorizationCacheService authorizationCacheService) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
         this.jwtProperties = jwtProperties;
+        this.authorizationCacheService = authorizationCacheService;
+    }
+
+    /**
+     * Kept for focused unit tests that construct the service without Spring.
+     */
+    AuthService(SysUserMapper userMapper,
+                PasswordEncoder passwordEncoder,
+                JwtTokenService jwtTokenService,
+                JwtProperties jwtProperties) {
+        this(userMapper, passwordEncoder, jwtTokenService, jwtProperties, null);
     }
 
     @Transactional(readOnly = true)
@@ -49,8 +64,8 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        Set<String> roles = toStableSet(userMapper.findRoleCodes(user.getId()));
-        Set<String> permissions = toStableSet(userMapper.findPermissionCodes(user.getId()));
+        Set<String> roles = toStableSet(findRoleCodes(user.getId()));
+        Set<String> permissions = toStableSet(findPermissionCodes(user.getId()));
         String accessToken = jwtTokenService.issue(new JwtClaims(
                 user.getId(), user.getUsername(), roles, permissions, null));
 
@@ -85,8 +100,8 @@ public class AuthService {
 
         return toCurrentUser(
                 user,
-                toStableSet(userMapper.findRoleCodes(user.getId())),
-                toStableSet(userMapper.findPermissionCodes(user.getId())));
+                toStableSet(findRoleCodes(user.getId())),
+                toStableSet(findPermissionCodes(user.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -100,8 +115,8 @@ public class AuthService {
         }
         return toCurrentUser(
                 user,
-                toStableSet(userMapper.findRoleCodes(userId)),
-                toStableSet(userMapper.findPermissionCodes(userId)));
+                toStableSet(findRoleCodes(userId)),
+                toStableSet(findPermissionCodes(userId)));
     }
 
     @Transactional
@@ -111,32 +126,29 @@ public class AuthService {
         }
         SysUser user = userMapper.findEnabledById(userId);
         if (user == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "User does not exist or is disabled");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在或已被停用");
         }
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Current password is incorrect");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "当前密码错误");
         }
-
-        String username = request.username() == null ? "" : request.username().trim();
-        String newPassword = request.newPassword() == null ? "" : request.newPassword();
-        if (username.isBlank() && newPassword.isBlank()) {
-            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "Enter a new username or password");
-        }
-
-        if (!username.isBlank() && !username.equals(user.getUsername())) {
-            if (userMapper.countByUsername(username) > 0) {
-                throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Username is already in use");
-            }
-            user.setUsername(username);
-        }
-        if (!newPassword.isBlank()) {
-            user.setPasswordHash(passwordEncoder.encode(newPassword));
-        }
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userMapper.updateById(user);
         return toCurrentUser(
                 user,
-                toStableSet(userMapper.findRoleCodes(userId)),
-                toStableSet(userMapper.findPermissionCodes(userId)));
+                toStableSet(findRoleCodes(userId)),
+                toStableSet(findPermissionCodes(userId)));
+    }
+
+    private List<String> findRoleCodes(Long userId) {
+        return authorizationCacheService == null
+                ? userMapper.findRoleCodes(userId)
+                : authorizationCacheService.findRoleCodes(userId);
+    }
+
+    private List<String> findPermissionCodes(Long userId) {
+        return authorizationCacheService == null
+                ? userMapper.findPermissionCodes(userId)
+                : authorizationCacheService.findPermissionCodes(userId);
     }
 
     private CurrentUserResponse toCurrentUser(SysUser user, Set<String> roles, Set<String> permissions) {
@@ -145,6 +157,7 @@ public class AuthService {
                 user.getDepartmentId(),
                 user.getUsername(),
                 user.getDisplayName(),
+                user.getAvatarFileName() == null ? null : "/api/v1/users/me/avatar",
                 user.getPhone(),
                 user.getEmail(),
                 roles,
