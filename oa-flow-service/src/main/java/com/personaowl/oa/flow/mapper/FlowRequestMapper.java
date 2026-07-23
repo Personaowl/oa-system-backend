@@ -12,6 +12,9 @@ import java.util.List;
 
 @Mapper
 public interface FlowRequestMapper extends BaseMapper<FlowRequest> {
+    @Select("SELECT * FROM flow_request ORDER BY created_at DESC, id DESC")
+    List<FlowRequest> findAllForIndex();
+
     @Select("""
             SELECT * FROM flow_request
             WHERE applicant_id = #{applicantId}

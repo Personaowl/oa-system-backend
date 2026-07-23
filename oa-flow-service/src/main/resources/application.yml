@@ -21,6 +21,7 @@ spring:
   data.redis:
     host: ${REDIS_HOST:127.0.0.1}
     port: ${REDIS_PORT:6379}
+  elasticsearch.uris: ${ELASTICSEARCH_URIS:http://127.0.0.1:9200}
 management:
   endpoints.web.exposure.include: health,info
   endpoint.health.probes.enabled: true

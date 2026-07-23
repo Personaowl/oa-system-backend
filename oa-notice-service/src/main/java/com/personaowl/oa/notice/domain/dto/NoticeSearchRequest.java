@@ -1,0 +1,32 @@
+package com.personaowl.oa.notice.domain.dto;
+
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
+
+public class NoticeSearchRequest {
+    private String keyword;
+    private String status;
+    private Boolean topFlag;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime publishedFrom;
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime publishedTo;
+    private Integer page = 1;
+    private Integer size = 20;
+
+    public String getKeyword() { return keyword; }
+    public void setKeyword(String keyword) { this.keyword = keyword; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Boolean getTopFlag() { return topFlag; }
+    public void setTopFlag(Boolean topFlag) { this.topFlag = topFlag; }
+    public LocalDateTime getPublishedFrom() { return publishedFrom; }
+    public void setPublishedFrom(LocalDateTime publishedFrom) { this.publishedFrom = publishedFrom; }
+    public LocalDateTime getPublishedTo() { return publishedTo; }
+    public void setPublishedTo(LocalDateTime publishedTo) { this.publishedTo = publishedTo; }
+    public Integer getPage() { return page; }
+    public void setPage(Integer page) { this.page = page; }
+    public Integer getSize() { return size; }
+    public void setSize(Integer size) { this.size = size; }
+}

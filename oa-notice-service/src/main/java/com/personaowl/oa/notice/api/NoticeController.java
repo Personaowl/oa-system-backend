@@ -7,11 +7,15 @@ import com.personaowl.oa.common.core.web.RequestHeaders;
 import com.personaowl.oa.common.web.PermissionGuard;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
+import com.personaowl.oa.notice.domain.dto.NoticeSearchRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
 import com.personaowl.oa.notice.domain.vo.NoticeDetailVO;
 import com.personaowl.oa.notice.domain.vo.NoticeListItemVO;
 import com.personaowl.oa.notice.domain.vo.NoticePageVO;
 import com.personaowl.oa.notice.domain.vo.NoticeUnreadCountVO;
+import com.personaowl.oa.notice.domain.vo.NoticeSearchItemVO;
+import com.personaowl.oa.notice.domain.vo.SearchReindexVO;
+import com.personaowl.oa.notice.search.NoticeSearchService;
 import com.personaowl.oa.notice.service.NoticeService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -105,6 +109,25 @@ public class NoticeController {
         return ApiResponse.success(noticeService.getById(id, requireUserId(userId), true), traceId);
     }
 
+    @GetMapping("/search")
+    public ApiResponse<NoticePageVO<NoticeSearchItemVO>> searchAdmin(
+            @Valid NoticeSearchRequest request,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:list");
+        return ApiResponse.success(noticeService.search(request, requireUserId(userId), false), traceId);
+    }
+
+    @PostMapping("/search/reindex")
+    public ApiResponse<SearchReindexVO> rebuildSearchIndex(
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:update");
+        int count = noticeService.rebuildSearchIndex();
+        return ApiResponse.success(new SearchReindexVO(NoticeSearchService.INDEX_NAME, count), traceId);
+    }
+
     @GetMapping("/public")
     public ApiResponse<NoticePageVO<NoticeListItemVO>> publicList(
             @Valid NoticeQueryRequest request,
@@ -113,6 +136,16 @@ public class NoticeController {
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "notice:read");
         return ApiResponse.success(noticeService.listPublished(request, requireUserId(userId)), traceId);
+    }
+
+    @GetMapping("/public/search")
+    public ApiResponse<NoticePageVO<NoticeSearchItemVO>> searchPublished(
+            @Valid NoticeSearchRequest request,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        permissionGuard.require(permissions, "notice:read");
+        return ApiResponse.success(noticeService.search(request, requireUserId(userId), true), traceId);
     }
 
     @GetMapping("/public/{id}")
