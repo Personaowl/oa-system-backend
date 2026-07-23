@@ -6,6 +6,7 @@ import com.personaowl.oa.common.core.error.ErrorCode;
 import com.personaowl.oa.common.redis.CacheNames;
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
+import com.personaowl.oa.notice.domain.dto.NoticeSearchRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
 import com.personaowl.oa.notice.domain.entity.Notice;
 import com.personaowl.oa.notice.domain.entity.NoticeRead;
@@ -14,9 +15,12 @@ import com.personaowl.oa.notice.domain.vo.NoticeDetailVO;
 import com.personaowl.oa.notice.domain.vo.NoticeListItemVO;
 import com.personaowl.oa.notice.domain.vo.NoticePageVO;
 import com.personaowl.oa.notice.domain.vo.NoticeUnreadCountVO;
+import com.personaowl.oa.notice.domain.vo.NoticeSearchItemVO;
 import com.personaowl.oa.notice.mapper.NoticeMapper;
 import com.personaowl.oa.notice.mapper.NoticeReadMapper;
 import com.personaowl.oa.notice.service.NoticeService;
+import com.personaowl.oa.notice.search.NoticeSearchService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
@@ -30,10 +34,18 @@ import java.util.List;
 public class NoticeServiceImpl implements NoticeService {
     private final NoticeMapper noticeMapper;
     private final NoticeReadMapper noticeReadMapper;
+    private final NoticeSearchService noticeSearchService;
 
     public NoticeServiceImpl(NoticeMapper noticeMapper, NoticeReadMapper noticeReadMapper) {
+        this(noticeMapper, noticeReadMapper, null);
+    }
+
+    @Autowired
+    public NoticeServiceImpl(NoticeMapper noticeMapper, NoticeReadMapper noticeReadMapper,
+                             NoticeSearchService noticeSearchService) {
         this.noticeMapper = noticeMapper;
         this.noticeReadMapper = noticeReadMapper;
+        this.noticeSearchService = noticeSearchService;
     }
 
     @Override
@@ -55,6 +67,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setCreatedAt(LocalDateTime.now());
         notice.setUpdatedAt(LocalDateTime.now());
         noticeMapper.insert(notice);
+        synchronize(notice);
         return notice;
     }
 
@@ -77,6 +90,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setTopFlag(Boolean.TRUE.equals(request.getTopFlag()));
         notice.setStatus(resolveStatus(request.getStatus()));
         noticeMapper.updateById(notice);
+        synchronize(notice);
         return notice;
     }
 
@@ -92,6 +106,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setUpdatedBy(operatorId);
         notice.setUpdatedAt(LocalDateTime.now());
         noticeMapper.updateById(notice);
+        if (noticeSearchService != null) noticeSearchService.deleteAfterCommit(notice.getId());
         return notice;
     }
 
@@ -101,6 +116,7 @@ public class NoticeServiceImpl implements NoticeService {
     public Notice publish(Long id, Long publisherId) {
         Notice notice = requireById(id);
         if (NoticeStatus.PUBLISHED.name().equals(notice.getStatus())) {
+            synchronize(notice);
             return notice;
         }
         if (NoticeStatus.OFFLINE.name().equals(notice.getStatus())) {
@@ -112,6 +128,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setUpdatedBy(publisherId);
         notice.setUpdatedAt(LocalDateTime.now());
         noticeMapper.updateById(notice);
+        synchronize(notice);
         return notice;
     }
 
@@ -121,6 +138,7 @@ public class NoticeServiceImpl implements NoticeService {
     public Notice offline(Long id, Long publisherId) {
         Notice notice = requireById(id);
         if (NoticeStatus.OFFLINE.name().equals(notice.getStatus())) {
+            synchronize(notice);
             return notice;
         }
         notice.setStatus(NoticeStatus.OFFLINE.name());
@@ -128,6 +146,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setUpdatedBy(publisherId);
         notice.setUpdatedAt(LocalDateTime.now());
         noticeMapper.updateById(notice);
+        synchronize(notice);
         return notice;
     }
 
@@ -170,6 +189,7 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setViewCount((notice.getViewCount() == null ? 0L : notice.getViewCount()) + 1);
         notice.setUpdatedAt(LocalDateTime.now());
         noticeMapper.updateById(notice);
+        synchronize(notice);
         NoticeDetailVO vo = toDetailVO(notice, currentUserId);
         vo.setRead(true);
         return vo;
@@ -179,6 +199,28 @@ public class NoticeServiceImpl implements NoticeService {
     @Cacheable(cacheNames = CacheNames.NOTICE_UNREAD_COUNT, key = "#currentUserId", sync = true)
     public NoticeUnreadCountVO unreadCount(Long currentUserId) {
         return new NoticeUnreadCountVO(noticeReadMapper.countUnreadByUser(currentUserId));
+    }
+
+    @Override
+    public NoticePageVO<NoticeSearchItemVO> search(NoticeSearchRequest request, Long currentUserId, boolean publishedOnly) {
+        if (noticeSearchService == null) return new NoticePageVO<>(0, List.of());
+        NoticeSearchRequest normalized = request == null ? new NoticeSearchRequest() : request;
+        NoticePageVO<NoticeSearchItemVO> page = noticeSearchService.search(normalized, publishedOnly);
+        for (NoticeSearchItemVO item : page.getRecords()) {
+            item.setRead(currentUserId != null && noticeReadMapper.existsByNoticeIdAndUserId(item.getId(), currentUserId));
+        }
+        return page;
+    }
+
+    @Override
+    public int rebuildSearchIndex() {
+        if (noticeSearchService == null) return 0;
+        return noticeSearchService.rebuild(noticeMapper.selectList(
+                new LambdaQueryWrapper<Notice>().eq(Notice::getDeleted, 0)));
+    }
+
+    private void synchronize(Notice notice) {
+        if (noticeSearchService != null) noticeSearchService.synchronizeAfterCommit(notice);
     }
 
     private NoticeQueryResult queryNotices(NoticeQueryRequest request, boolean publishedOnly) {

@@ -4,6 +4,7 @@ import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import com.personaowl.oa.flow.domain.dto.FlowApprovalRequest;
 import com.personaowl.oa.flow.domain.dto.FlowSubmitRequest;
+import com.personaowl.oa.flow.domain.dto.FlowSearchRequest;
 import com.personaowl.oa.flow.domain.entity.FlowActionLog;
 import com.personaowl.oa.flow.domain.entity.FlowRequest;
 import com.personaowl.oa.flow.domain.enums.FlowDecision;
@@ -11,10 +12,13 @@ import com.personaowl.oa.flow.domain.enums.FlowRequestStatus;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
 import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
+import com.personaowl.oa.flow.domain.vo.FlowSearchPageResponse;
+import com.personaowl.oa.flow.search.FlowSearchService;
 import com.personaowl.oa.flow.mapper.FlowActionLogMapper;
 import com.personaowl.oa.flow.mapper.FlowRequestMapper;
 import com.personaowl.oa.flow.mapper.FlowUserDirectoryMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -26,14 +30,25 @@ public class FlowApprovalService {
     private final FlowRequestMapper requestMapper;
     private final FlowActionLogMapper actionLogMapper;
     private final FlowUserDirectoryMapper userDirectoryMapper;
+    private final FlowSearchService flowSearchService;
 
     public FlowApprovalService(
             FlowRequestMapper requestMapper,
             FlowActionLogMapper actionLogMapper,
             FlowUserDirectoryMapper userDirectoryMapper) {
+        this(requestMapper, actionLogMapper, userDirectoryMapper, null);
+    }
+
+    @Autowired
+    public FlowApprovalService(
+            FlowRequestMapper requestMapper,
+            FlowActionLogMapper actionLogMapper,
+            FlowUserDirectoryMapper userDirectoryMapper,
+            FlowSearchService flowSearchService) {
         this.requestMapper = requestMapper;
         this.actionLogMapper = actionLogMapper;
         this.userDirectoryMapper = userDirectoryMapper;
+        this.flowSearchService = flowSearchService;
     }
 
     @Transactional
@@ -60,6 +75,7 @@ public class FlowApprovalService {
         if (requestMapper.insert(entity) != 1) {
             throw new IllegalStateException("创建审批申请失败");
         }
+        synchronize(entity, null);
         return toResponse(entity, null);
     }
 
@@ -133,7 +149,28 @@ public class FlowApprovalService {
         request.setStatus(newStatus);
         request.setCurrentApproverId(null);
         request.setUpdatedAt(now);
+        synchronize(request, action);
         return toResponse(request, action);
+    }
+
+    @Transactional(readOnly = true)
+    public FlowSearchPageResponse search(FlowSearchRequest request, Long currentUserId, boolean allVisible) {
+        Long userId = requireUserId(currentUserId);
+        if (flowSearchService == null) return new FlowSearchPageResponse(0, List.of());
+        return flowSearchService.search(request == null ? new FlowSearchRequest() : request, userId, allVisible);
+    }
+
+    @Transactional(readOnly = true)
+    public int rebuildSearchIndex() {
+        if (flowSearchService == null) return 0;
+        List<FlowSearchService.IndexedFlow> flows = requestMapper.findAllForIndex().stream()
+                .map(request -> new FlowSearchService.IndexedFlow(request, actionLogMapper.findLatest(request.getId())))
+                .toList();
+        return flowSearchService.rebuild(flows);
+    }
+
+    private void synchronize(FlowRequest request, FlowActionLog action) {
+        if (flowSearchService != null) flowSearchService.synchronizeAfterCommit(request, action);
     }
 
     private List<FlowRequestResponse> toResponses(List<FlowRequest> requests) {

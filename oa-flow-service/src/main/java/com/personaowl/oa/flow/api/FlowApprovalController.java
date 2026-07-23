@@ -6,9 +6,13 @@ import com.personaowl.oa.common.core.error.ErrorCode;
 import com.personaowl.oa.common.core.web.RequestHeaders;
 import com.personaowl.oa.flow.domain.dto.FlowApprovalRequest;
 import com.personaowl.oa.flow.domain.dto.FlowSubmitRequest;
+import com.personaowl.oa.flow.domain.dto.FlowSearchRequest;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
 import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
+import com.personaowl.oa.flow.domain.vo.FlowSearchPageResponse;
+import com.personaowl.oa.flow.domain.vo.FlowSearchReindexResponse;
+import com.personaowl.oa.flow.search.FlowSearchService;
 import com.personaowl.oa.flow.service.FlowApprovalService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -74,6 +78,26 @@ public class FlowApprovalController {
         return ApiResponse.success(flowApprovalService.detail(id, userId), traceId);
     }
 
+    @GetMapping("/search")
+    public ApiResponse<FlowSearchPageResponse> search(
+            @Valid FlowSearchRequest request,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        requirePermission(permissions, "flow:read");
+        boolean allVisible = permissionSet(permissions).contains("system:admin");
+        return ApiResponse.success(flowApprovalService.search(request, userId, allVisible), traceId);
+    }
+
+    @PostMapping("/search/reindex")
+    public ApiResponse<FlowSearchReindexResponse> rebuildSearchIndex(
+            @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        requirePermission(permissions, "system:admin");
+        int count = flowApprovalService.rebuildSearchIndex();
+        return ApiResponse.success(new FlowSearchReindexResponse(FlowSearchService.INDEX_NAME, count), traceId);
+    }
+
     @GetMapping("/tasks/todo")
     public ApiResponse<List<FlowRequestResponse>> todo(
             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
@@ -104,12 +128,15 @@ public class FlowApprovalController {
     }
 
     private void requireApprovePermission(String permissions) {
-        if (permissions == null || permissions.isBlank()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
-        Set<String> permissionSet = new HashSet<>(Arrays.asList(permissions.split("[,;\\s]+")));
-        if (!permissionSet.contains(APPROVE_PERMISSION)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
+        requirePermission(permissions, APPROVE_PERMISSION);
+    }
+
+    private void requirePermission(String permissions, String required) {
+        if (!permissionSet(permissions).contains(required)) throw new BusinessException(ErrorCode.FORBIDDEN);
+    }
+
+    private Set<String> permissionSet(String permissions) {
+        if (permissions == null || permissions.isBlank()) return Set.of();
+        return new HashSet<>(Arrays.asList(permissions.split("[,;\\s]+")));
     }
 }

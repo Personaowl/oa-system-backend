@@ -2,12 +2,14 @@ package com.personaowl.oa.notice.service;
 
 import com.personaowl.oa.notice.domain.dto.NoticeCreateRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeQueryRequest;
+import com.personaowl.oa.notice.domain.dto.NoticeSearchRequest;
 import com.personaowl.oa.notice.domain.dto.NoticeUpdateRequest;
 import com.personaowl.oa.notice.domain.entity.Notice;
 import com.personaowl.oa.notice.domain.vo.NoticeDetailVO;
 import com.personaowl.oa.notice.domain.vo.NoticeListItemVO;
 import com.personaowl.oa.notice.domain.vo.NoticePageVO;
 import com.personaowl.oa.notice.domain.vo.NoticeUnreadCountVO;
+import com.personaowl.oa.notice.domain.vo.NoticeSearchItemVO;
 
 public interface NoticeService {
     Notice create(NoticeCreateRequest request, Long publisherId);
@@ -29,4 +31,8 @@ public interface NoticeService {
     NoticeDetailVO read(Long id, Long currentUserId);
 
     NoticeUnreadCountVO unreadCount(Long currentUserId);
+
+    NoticePageVO<NoticeSearchItemVO> search(NoticeSearchRequest request, Long currentUserId, boolean publishedOnly);
+
+    int rebuildSearchIndex();
 }
