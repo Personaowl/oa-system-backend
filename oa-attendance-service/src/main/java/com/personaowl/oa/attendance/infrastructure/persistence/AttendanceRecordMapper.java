@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.personaowl.oa.attendance.domain.AttendanceStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -29,6 +31,41 @@ public interface AttendanceRecordMapper extends BaseMapper<AttendanceRecordEntit
                          @Param("status") AttendanceStatus status,
                          @Param("earlyLeaveMinutes") int earlyLeaveMinutes,
                          @Param("version") int version);
+
+    @Update("""
+            UPDATE attendance_record
+            SET status = 'MISSING_CHECK_OUT',
+                updated_at = #{updatedAt},
+                version = version + 1
+            WHERE work_date = #{workDate}
+              AND check_in_time IS NOT NULL
+              AND check_out_time IS NULL
+              AND status IN ('IN_PROGRESS', 'IN_PROGRESS_LATE')
+            """)
+    int finalizeMissingCheckOut(@Param("workDate") LocalDate workDate,
+                                @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Select("""
+            SELECT u.id
+            FROM sys_user u
+            JOIN sys_department d ON d.id = u.department_id
+            WHERE u.status = 1 AND u.deleted = 0
+              AND d.status = 1 AND d.deleted = 0
+            ORDER BY u.id
+            """)
+    List<Long> findActiveAttendanceUserIds();
+
+    @Insert("""
+            INSERT IGNORE INTO attendance_record
+            (id, user_id, work_date, status, late_minutes, early_leave_minutes,
+             created_at, updated_at, version)
+            VALUES
+            (#{id}, #{userId}, #{workDate}, 'ABSENT', 0, 0, #{now}, #{now}, 0)
+            """)
+    int insertAbsentIfMissing(@Param("id") Long id,
+                              @Param("userId") Long userId,
+                              @Param("workDate") LocalDate workDate,
+                              @Param("now") LocalDateTime now);
 
     AttendanceStatisticsAggregate aggregateStatistics(@Param("userId") Long userId,
                                                        @Param("startDate") LocalDate startDate,

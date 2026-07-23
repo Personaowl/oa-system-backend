@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
 
 import java.util.List;
 
@@ -119,12 +121,35 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
 
     @Select("""
             SELECT u.display_name
-            FROM sys_department d
-            JOIN sys_user u ON u.id = d.manager_id
-            WHERE d.id = #{departmentId} AND d.deleted = 0
+            FROM sys_department_manager dm
+            JOIN sys_user u ON u.id = dm.user_id
+            JOIN sys_department d ON d.id = dm.department_id
+            WHERE dm.department_id = #{departmentId} AND d.deleted = 0
               AND u.deleted = 0 AND u.status = 1
+            ORDER BY dm.is_primary DESC, dm.created_at, u.id
             """)
     List<String> findManagerNames(@Param("departmentId") Long departmentId);
+
+    @Select("""
+            SELECT dm.user_id
+            FROM sys_department_manager dm
+            JOIN sys_user u ON u.id = dm.user_id
+            WHERE dm.department_id = #{departmentId}
+              AND u.deleted = 0 AND u.status = 1
+            ORDER BY dm.is_primary DESC, dm.created_at, dm.user_id
+            """)
+    List<Long> findManagerIds(@Param("departmentId") Long departmentId);
+
+    @Delete("DELETE FROM sys_department_manager WHERE department_id = #{departmentId}")
+    int deleteDepartmentManagers(@Param("departmentId") Long departmentId);
+
+    @Insert("""
+            INSERT INTO sys_department_manager (department_id, user_id, is_primary, created_at)
+            VALUES (#{departmentId}, #{userId}, #{primary}, CURRENT_TIMESTAMP)
+            """)
+    int insertDepartmentManager(@Param("departmentId") Long departmentId,
+                                @Param("userId") Long userId,
+                                @Param("primary") boolean primary);
 
     /**
      * 逻辑删除部门。

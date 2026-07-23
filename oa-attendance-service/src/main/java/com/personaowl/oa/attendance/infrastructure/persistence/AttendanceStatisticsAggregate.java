@@ -8,6 +8,8 @@ public class AttendanceStatisticsAggregate {
     private long lateCount;
     private long earlyLeaveCount;
     private long missingCheckOutCount;
+    private long missingCheckInCount;
+    private long absentCount;
 
     public long getTotalRecords() {
         return totalRecords;
@@ -56,4 +58,9 @@ public class AttendanceStatisticsAggregate {
     public void setMissingCheckOutCount(long missingCheckOutCount) {
         this.missingCheckOutCount = missingCheckOutCount;
     }
+
+    public long getMissingCheckInCount() { return missingCheckInCount; }
+    public void setMissingCheckInCount(long missingCheckInCount) { this.missingCheckInCount = missingCheckInCount; }
+    public long getAbsentCount() { return absentCount; }
+    public void setAbsentCount(long absentCount) { this.absentCount = absentCount; }
 }

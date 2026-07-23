@@ -16,6 +16,7 @@ import org.springframework.cache.annotation.Caching;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -101,7 +102,7 @@ public class DepartmentService {
         String name = normalizeName(request.name());
         Integer sortOrder = normalizeSortOrder(request.sortOrder());
         Integer status = normalizeStatus(request.status());
-        Long managerId = normalizeManagerId(request.managerId());
+        ManagerAssignment managers = normalizeManagers(request.managerId(), request.assistantManagerIds());
 
         /*
          * 非根部门必须拥有一个真实存在的父部门。
@@ -130,7 +131,7 @@ public class DepartmentService {
         SysDepartment department = new SysDepartment();
         department.setParentId(parentId);
         department.setName(name);
-        department.setManagerId(managerId);
+        department.setManagerId(managers.primaryManagerId());
         department.setSortOrder(sortOrder);
         department.setStatus(status);
         department.setCreatedAt(now);
@@ -148,6 +149,7 @@ public class DepartmentService {
              */
             throw new IllegalStateException("创建部门失败");
         }
+        synchronizeManagers(department.getId(), managers);
 
         return toResponse(department);
     }
@@ -185,7 +187,7 @@ public class DepartmentService {
         String name = normalizeName(request.name());
         Integer sortOrder = normalizeSortOrder(request.sortOrder());
         Integer status = normalizeStatus(request.status());
-        Long managerId = normalizeManagerId(request.managerId());
+        ManagerAssignment managers = normalizeManagers(request.managerId(), request.assistantManagerIds());
 
         /*
          * 检查新的父部门是否合法。
@@ -217,7 +219,7 @@ public class DepartmentService {
 
         department.setParentId(parentId);
         department.setName(name);
-        department.setManagerId(managerId);
+        department.setManagerId(managers.primaryManagerId());
         department.setSortOrder(sortOrder);
         department.setStatus(status);
         department.setUpdatedAt(LocalDateTime.now());
@@ -227,6 +229,7 @@ public class DepartmentService {
         if (affectedRows != 1) {
             throw new IllegalStateException("更新部门失败");
         }
+        synchronizeManagers(department.getId(), managers);
 
         return toResponse(department);
     }
@@ -290,6 +293,7 @@ public class DepartmentService {
         if (affectedRows != 1) {
             throw new IllegalStateException("删除部门失败");
         }
+        departmentMapper.deleteDepartmentManagers(id);
     }
 
     /**
@@ -322,6 +326,7 @@ public class DepartmentService {
     private DepartmentResponse toResponse(SysDepartment department) {
         return DepartmentResponse.from(
                 department,
+                departmentMapper.findManagerIds(department.getId()),
                 departmentMapper.countUsers(department.getId()),
                 departmentMapper.findManagerNames(department.getId()));
     }
@@ -466,6 +471,43 @@ public class DepartmentService {
         }
         return managerId;
     }
+
+    private ManagerAssignment normalizeManagers(Long primaryManagerId, List<Long> assistantManagerIds) {
+        Long primary = normalizeManagerId(primaryManagerId);
+        LinkedHashSet<Long> assistants = new LinkedHashSet<>();
+        if (assistantManagerIds != null) {
+            for (Long userId : assistantManagerIds) {
+                Long normalized = normalizeManagerId(userId);
+                if (normalized == null) {
+                    throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "协同负责人不能为空");
+                }
+                if (!normalized.equals(primary)) assistants.add(normalized);
+            }
+        }
+        if (primary == null && !assistants.isEmpty()) {
+            throw new BusinessException(
+                    ErrorCode.BUSINESS_RULE_VIOLATION,
+                    "配置协同主管前必须先指定主负责人"
+            );
+        }
+        if (assistants.size() > 10) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "一个部门最多配置10名协同主管");
+        }
+        return new ManagerAssignment(primary, List.copyOf(assistants));
+    }
+
+    private void synchronizeManagers(Long departmentId, ManagerAssignment managers) {
+        departmentMapper.deleteDepartmentManagers(departmentId);
+        if (managers.primaryManagerId() != null) {
+            departmentMapper.insertDepartmentManager(
+                    departmentId, managers.primaryManagerId(), true);
+        }
+        for (Long assistantId : managers.assistantManagerIds()) {
+            departmentMapper.insertDepartmentManager(departmentId, assistantId, false);
+        }
+    }
+
+    private record ManagerAssignment(Long primaryManagerId, List<Long> assistantManagerIds) {}
 
     /**
      * 处理部门状态。

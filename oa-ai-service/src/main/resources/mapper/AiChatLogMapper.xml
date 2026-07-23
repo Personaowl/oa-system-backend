@@ -10,6 +10,7 @@
         <result column="user_id" property="userId"/>
         <result column="question" property="question"/>
         <result column="answer" property="answer"/>
+        <result column="knowledge_domain" property="knowledgeDomain"/>
         <result column="retrieved_doc_ids" property="retrievedDocIds"/>
         <result column="retrieved_chunk_ids" property="retrievedChunkIds"/>
         <result column="citations_json" property="citationsJson"/>
@@ -31,31 +32,42 @@
     </insert>
 
     <select id="selectById" resultMap="BaseResultMap">
-        SELECT * FROM ai_chat_log WHERE id = #{id}
+        SELECT l.*, s.knowledge_domain
+        FROM ai_chat_log l
+        LEFT JOIN ai_chat_session s ON s.id = l.session_id
+        WHERE l.id = #{id}
     </select>
 
     <select id="selectBySessionId" resultMap="BaseResultMap">
-        SELECT *
-        FROM ai_chat_log
-        WHERE session_id = #{sessionId}
-        ORDER BY created_at ASC, id ASC
+        SELECT l.*, s.knowledge_domain
+        FROM ai_chat_log l
+        LEFT JOIN ai_chat_session s ON s.id = l.session_id
+        WHERE l.session_id = #{sessionId}
+        ORDER BY l.created_at ASC, l.id ASC
     </select>
 
     <select id="selectPage" resultMap="BaseResultMap">
-        SELECT *
-        FROM ai_chat_log
+        SELECT l.*, s.knowledge_domain
+        FROM ai_chat_log l
+        LEFT JOIN ai_chat_session s ON s.id = l.session_id
         WHERE 1 = 1
         <if test="queryUserId != null">
-            AND user_id = #{queryUserId}
+            AND l.user_id = #{queryUserId}
         </if>
         <if test="userId != null">
-            AND user_id = #{userId}
+            AND l.user_id = #{userId}
         </if>
         <if test="keyword != null and keyword != ''">
-            AND (question LIKE CONCAT('%', #{keyword}, '%')
-                 OR answer LIKE CONCAT('%', #{keyword}, '%'))
+            AND (l.question LIKE CONCAT('%', #{keyword}, '%')
+                 OR l.answer LIKE CONCAT('%', #{keyword}, '%'))
         </if>
-        ORDER BY created_at DESC
+        <if test="knowledgeDomain != null and knowledgeDomain != ''">
+            AND s.knowledge_domain = #{knowledgeDomain}
+        </if>
+        <if test="hitFlag != null">
+            AND l.hit_flag = #{hitFlag}
+        </if>
+        ORDER BY l.created_at DESC
         LIMIT #{size} OFFSET #{offset}
     </select>
 

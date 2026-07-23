@@ -9,6 +9,7 @@ public class AiChatLog {
     private Long userId;
     private String question;
     private String answer;
+    private String knowledgeDomain;
     private String retrievedDocIds;
     private String retrievedChunkIds;
     private String citationsJson;
@@ -29,6 +30,8 @@ public class AiChatLog {
     public void setQuestion(String question) { this.question = question; }
     public String getAnswer() { return answer; }
     public void setAnswer(String answer) { this.answer = answer; }
+    public String getKnowledgeDomain() { return knowledgeDomain; }
+    public void setKnowledgeDomain(String knowledgeDomain) { this.knowledgeDomain = knowledgeDomain; }
     public String getRetrievedDocIds() { return retrievedDocIds; }
     public void setRetrievedDocIds(String retrievedDocIds) { this.retrievedDocIds = retrievedDocIds; }
     public String getRetrievedChunkIds() { return retrievedChunkIds; }

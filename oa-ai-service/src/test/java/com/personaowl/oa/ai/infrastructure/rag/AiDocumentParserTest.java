@@ -8,6 +8,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class AiDocumentParserTest {
 
@@ -31,5 +32,25 @@ class AiDocumentParserTest {
         assertFalse(chunks.isEmpty());
         assertNotNull(chunks.getFirst().chunkText());
         assertNotNull(chunks.getFirst().chunkTitle());
+    }
+
+    @Test
+    void splitByStructureShouldRecognizeMarkdownHeadings() {
+        String raw = "# OA 考勤制度\n简介\n## 1. 打卡规则\n员工应按时打卡。\n## 2. 补卡规则\n缺卡后提交补卡申请。";
+
+        List<AiDocumentParser.ChunkSection> chunks = parser.splitByStructure(raw, "考勤制度", 500, 80);
+
+        assertEquals(3, chunks.size());
+        assertTrue(chunks.get(1).chunkTitle().contains("打卡规则"));
+    }
+
+    @Test
+    void splitByStructureShouldKeepConfiguredOverlap() {
+        String raw = "abcdefghijklmnopqrstuvwxyz";
+
+        List<AiDocumentParser.ChunkSection> chunks = parser.splitByStructure(raw, "测试", 10, 3);
+
+        assertTrue(chunks.size() > 1);
+        assertEquals("hij", chunks.get(1).chunkText().substring(0, 3));
     }
 }

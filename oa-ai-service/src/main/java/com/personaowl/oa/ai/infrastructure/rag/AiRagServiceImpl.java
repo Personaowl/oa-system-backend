@@ -9,6 +9,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -44,18 +45,20 @@ public class AiRagServiceImpl implements AiRagService {
     }
 
     @Override
-    public Flux<String> answerStream(String question, String knowledgeDomain, Integer topK) {
-        return Flux.defer(() -> {
-            PromptData promptData = buildPromptData(question, knowledgeDomain, topK);
-            return chatClient.prompt(toPrompt(promptData))
-                    .stream()
-                    .content()
-                    .filter(content -> content != null && !content.isEmpty())
-                    .switchIfEmpty(Flux.just(FALLBACK_ANSWER));
-        }).onErrorResume(ex -> {
+    public StreamResult answerStream(String question, String knowledgeDomain, Integer topK) {
+        PromptData promptData = buildPromptData(question, knowledgeDomain, topK);
+        List<Document> documents = promptData.documents();
+        Flux<String> content = chatClient.prompt(toPrompt(promptData))
+                .stream()
+                .content()
+                .filter(token -> token != null && !token.isEmpty())
+                .switchIfEmpty(Flux.just(FALLBACK_ANSWER))
+                .onErrorResume(ex -> {
             log.warn("AI streaming invocation failed, returning fallback answer: {}", ex.getMessage());
             return Flux.just(FALLBACK_ANSWER);
         });
+        return new StreamResult(content, !documents.isEmpty(), toCitations(documents),
+                toMatchedDocs(documents), confidence(documents));
     }
 
     private String generateAnswer(PromptData promptData) {
@@ -74,29 +77,52 @@ public class AiRagServiceImpl implements AiRagService {
 
     private RagResult toResult(String answer, List<Document> documents) {
         boolean hit = !documents.isEmpty();
-        List<Citation> citations = documents.stream()
+        return new RagResult(answer, hit, toCitations(documents), toMatchedDocs(documents), confidence(documents));
+    }
+
+    private List<Citation> toCitations(List<Document> documents) {
+        return documents.stream()
                 .map(doc -> new Citation(
                         toLong(doc.getMetadata().get("docId")),
                         string(doc.getMetadata().get("docTitle")),
                         toLong(doc.getMetadata().get("chunkId")),
                         toInt(doc.getMetadata().get("chunkNo")),
                         doc.getText(),
-                        0.9d))
+                        score(doc)))
                 .toList();
-        List<MatchedDoc> matchedDocs = documents.stream()
+    }
+
+    private List<MatchedDoc> toMatchedDocs(List<Document> documents) {
+        return documents.stream()
                 .map(doc -> new MatchedDoc(
                         toLong(doc.getMetadata().get("docId")),
                         string(doc.getMetadata().get("docTitle")),
                         string(doc.getMetadata().get("docVersion"))))
+                .distinct()
                 .toList();
-        return new RagResult(answer, hit, citations, matchedDocs, hit ? 0.85d : 0.0d);
+    }
+
+    private double confidence(List<Document> documents) {
+        return documents.stream().mapToDouble(this::score).max().orElse(0.0d);
+    }
+
+    private double score(Document document) {
+        return document.getScore() == null ? 0.0d : document.getScore();
     }
 
     private PromptData buildPromptData(String question, String knowledgeDomain, Integer topK) {
-        int k = topK == null ? Math.max(1, properties.topK()) : topK;
+        int k = Math.min(20, topK == null ? Math.max(1, properties.topK()) : Math.max(1, topK));
+        SearchRequest.Builder request = SearchRequest.builder()
+                .query(question)
+                .topK(k)
+                .similarityThreshold(Math.max(0.0d, Math.min(1.0d, properties.minScore())));
+        if (knowledgeDomain != null && !knowledgeDomain.isBlank() && !"ALL".equalsIgnoreCase(knowledgeDomain)) {
+            request.filterExpression(new FilterExpressionBuilder()
+                    .eq("docDomain", knowledgeDomain.trim().toUpperCase())
+                    .build());
+        }
         List<Document> documents = Optional.ofNullable(
-                        vectorStore.similaritySearch(
-                                SearchRequest.builder().query(question).topK(k).build()))
+                        vectorStore.similaritySearch(request.build()))
                 .orElseGet(List::of);
         String context = documents.stream()
                 .map(doc -> "[" + doc.getMetadata().getOrDefault("docTitle", "")

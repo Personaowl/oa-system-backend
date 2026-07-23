@@ -14,13 +14,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
@@ -67,7 +68,7 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
         entity.setDocVersion(docVersion);
         entity.setFileName(fileName);
         entity.setFileUrl(buildFileUrl(fileName));
-        entity.setContentHash(UUID.randomUUID().toString().replace("-", ""));
+        entity.setContentHash(sha256(fileBytes));
         entity.setStatus("DRAFT");
         entity.setSourceType(sourceType == null ? "UPLOAD" : sourceType);
         entity.setEffectiveDate(effectiveDate);
@@ -130,7 +131,9 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
         entity.setUpdatedAt(LocalDateTime.now());
         entity.setVersion(entity.getVersion() == null ? 1 : entity.getVersion() + 1);
         aiKnowledgeDocMapper.updateById(entity);
-        syncVectorStore(entity);
+        if ("APPROVED".equals(entity.getStatus())) {
+            syncVectorStore(entity);
+        }
         return toVO(entity);
     }
 
@@ -194,11 +197,7 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
     private void parseAndPersistDocument(AiKnowledgeDoc entity, byte[] fileBytes, String fileName) {
         String rawText = aiDocumentParser.extractText(fileBytes, fileName, entity.getDocTitle());
         List<AiDocumentParser.ChunkSection> sections = aiDocumentParser.splitByStructure(rawText, entity.getDocTitle(), CHUNK_SIZE, CHUNK_OVERLAP);
-        List<String> texts = sections.stream().map(AiDocumentParser.ChunkSection::chunkText).toList();
         persistChunks(entity.getId(), entity.getDocTitle(), entity.getDocVersion(), sections);
-        if (!texts.isEmpty()) {
-            vectorStoreGateway.upsert(entity.getId(), entity.getDocTitle(), entity.getDocVersion(), texts);
-        }
     }
 
     private void syncVectorStore(AiKnowledgeDoc entity) {
@@ -206,7 +205,8 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        vectorStoreGateway.upsert(entity.getId(), entity.getDocTitle(), entity.getDocVersion(), chunks.stream().map(AiKnowledgeChunk::getChunkText).toList());
+        vectorStoreGateway.upsert(entity.getId(), entity.getDocTitle(), entity.getDocDomain(),
+                entity.getDocVersion(), chunks.stream().map(AiKnowledgeChunk::getChunkText).toList());
     }
 
     private void persistChunks(Long docId, String docTitle, String docVersion, List<AiDocumentParser.ChunkSection> sections) {
@@ -222,7 +222,8 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
             chunk.setChunkText(section.chunkText());
             chunk.setChunkHash(UUID.randomUUID().toString().replace("-", ""));
             chunk.setVectorKey("oa:knowledge:" + docId + ":" + section.chunkNo());
-            chunk.setMetadataJson("{\"docId\":" + docId + ",\"docVersion\":\"" + docVersion + "\",\"chunkNo\":" + section.chunkNo() + "}");
+            chunk.setMetadataJson("{\"docId\":" + docId + ",\"docVersion\":\"" + docVersion
+                    + "\",\"chunkNo\":" + section.chunkNo() + "}");
             chunk.setEmbeddingModel("BAAI/bge-m3");
             chunk.setEmbeddingDim(1024);
             chunk.setStatus("ACTIVE");
@@ -245,13 +246,16 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
             if (end >= normalized.length()) {
                 break;
             }
-            start = Math.max(end - CHUNK_OVERLAP, end);
+            start = end - Math.min(CHUNK_OVERLAP, CHUNK_SIZE - 1);
         }
         return result;
     }
 
     private AiKnowledgeDocVO toVO(AiKnowledgeDoc entity) {
-        List<AiKnowledgeChunkVO> chunks = aiKnowledgeChunkMapper.selectByDocId(entity.getId()).stream().map(this::toVO).toList();
+        List<AiKnowledgeChunk> entities = aiKnowledgeChunkMapper.selectByDocId(entity.getId());
+        List<AiKnowledgeChunkVO> chunks = entities == null
+                ? Collections.emptyList()
+                : entities.stream().map(this::toVO).toList();
         return new AiKnowledgeDocVO(
                 entity.getId(),
                 entity.getDocTitle(),
@@ -286,6 +290,15 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
 
     private String buildFileUrl(String fileName) {
         return fileName == null ? null : "/upload/ai/" + fileName;
+    }
+
+    private String sha256(byte[] content) {
+        try {
+            byte[] bytes = content == null ? new byte[0] : content;
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (Exception ex) {
+            throw new IllegalStateException("无法计算知识文档内容摘要", ex);
+        }
     }
 
     private int safePage(Integer page) { return page == null || page < 1 ? 1 : page; }

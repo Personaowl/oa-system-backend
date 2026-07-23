@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
 @Component
 public class AiDocumentParser {
 
-    private static final Pattern SECTION_PATTERN = Pattern.compile("(?m)^(第[一二三四五六七八九十百千0-9]+[条章节].*|\\d+(?:\\.\\d+)*\\s+.*|[一二三四五六七八九十]+、.*)$");
+    private static final Pattern SECTION_PATTERN = Pattern.compile(
+            "(?m)^(#{1,6}\\s+.+|第[一二三四五六七八九十百千0-9]+[条章节].*|\\d+(?:\\.\\d+)*[.、]?\\s+.*|[一二三四五六七八九十]+、.*)$");
     private final Tika tika = new Tika();
 
     public String extractText(byte[] bytes, String fileName, String fallbackTitle) {
@@ -91,7 +92,8 @@ public class AiDocumentParser {
             if (end >= text.length()) {
                 break;
             }
-            start = Math.max(end - overlap, end);
+            int safeOverlap = Math.max(0, Math.min(overlap, chunkSize - 1));
+            start = end - safeOverlap;
         }
         return result;
     }

@@ -6,11 +6,15 @@ import com.personaowl.oa.attendance.config.AttendanceProperties;
 import com.personaowl.oa.attendance.domain.RuleSnapshot;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRuleEntity;
 import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRuleMapper;
+import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceShiftEntity;
+import com.personaowl.oa.attendance.infrastructure.persistence.AttendanceShiftMapper;
 import com.personaowl.oa.attendance.support.AttendanceAuthorizationService;
 import com.personaowl.oa.attendance.support.OperatorContext;
 import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -22,13 +26,23 @@ public class AttendanceRuleService {
     private final AttendanceRuleMapper ruleMapper;
     private final AttendanceProperties properties;
     private final AttendanceAuthorizationService authorizationService;
+    private final AttendanceShiftMapper shiftMapper;
+
+    @Autowired
+    public AttendanceRuleService(AttendanceRuleMapper ruleMapper,
+                                 AttendanceProperties properties,
+                                 AttendanceAuthorizationService authorizationService,
+                                 AttendanceShiftMapper shiftMapper) {
+        this.ruleMapper = ruleMapper;
+        this.properties = properties;
+        this.authorizationService = authorizationService;
+        this.shiftMapper = shiftMapper;
+    }
 
     public AttendanceRuleService(AttendanceRuleMapper ruleMapper,
                                  AttendanceProperties properties,
                                  AttendanceAuthorizationService authorizationService) {
-        this.ruleMapper = ruleMapper;
-        this.properties = properties;
-        this.authorizationService = authorizationService;
+        this(ruleMapper, properties, authorizationService, null);
     }
 
     @Transactional(readOnly = true)
@@ -74,7 +88,23 @@ public class AttendanceRuleService {
         } else {
             ruleMapper.updateById(entity);
         }
+        synchronizeDefaultShift(request);
         return toResponse(entity);
+    }
+
+    private void synchronizeDefaultShift(AttendanceRuleUpdateRequest request) {
+        if (shiftMapper == null) return;
+        AttendanceShiftEntity defaultShift = shiftMapper.selectOne(
+                Wrappers.<AttendanceShiftEntity>lambdaQuery()
+                        .eq(AttendanceShiftEntity::getIsDefault, 1)
+                        .orderByAsc(AttendanceShiftEntity::getId)
+                        .last("LIMIT 1"));
+        if (defaultShift == null) return;
+        defaultShift.setWorkStart(request.workStart());
+        defaultShift.setWorkEnd(request.workEnd());
+        defaultShift.setLateThresholdMinutes(request.lateThresholdMinutes());
+        defaultShift.setUpdatedAt(LocalDateTime.now());
+        shiftMapper.updateById(defaultShift);
     }
 
     private AttendanceRuleResponse toResponse(AttendanceRuleEntity entity) {

@@ -59,6 +59,7 @@ public class AttendanceApplicationService {
     private final AttendanceAuthorizationService authorizationService;
     private final AttendanceScopeMapper scopeMapper;
     private final AttendanceRuleService ruleService;
+    private final WorkScheduleService scheduleService;
 
     @Autowired
     public AttendanceApplicationService(AttendanceRecordMapper recordMapper,
@@ -69,7 +70,8 @@ public class AttendanceApplicationService {
                                         TransactionTemplate transactionTemplate,
                                         AttendanceAuthorizationService authorizationService,
                                         AttendanceScopeMapper scopeMapper,
-                                        AttendanceRuleService ruleService) {
+                                        AttendanceRuleService ruleService,
+                                        WorkScheduleService scheduleService) {
         this.recordMapper = recordMapper;
         this.lockService = lockService;
         this.properties = properties;
@@ -79,6 +81,7 @@ public class AttendanceApplicationService {
         this.authorizationService = authorizationService;
         this.scopeMapper = scopeMapper;
         this.ruleService = ruleService;
+        this.scheduleService = scheduleService;
     }
 
     public AttendanceApplicationService(AttendanceRecordMapper recordMapper,
@@ -89,14 +92,14 @@ public class AttendanceApplicationService {
                                         TransactionTemplate transactionTemplate,
                                         AttendanceAuthorizationService authorizationService) {
         this(recordMapper, lockService, properties, ruleCalculator, clock,
-                transactionTemplate, authorizationService, null, null);
+                transactionTemplate, authorizationService, null, null, null);
     }
 
     public CheckInResponse checkIn(OperatorContext operator) {
         long startedAt = System.nanoTime();
         LocalDateTime checkInTime = LocalDateTime.now(clock).truncatedTo(ChronoUnit.MILLIS);
         LocalDate workDate = checkInTime.toLocalDate();
-        RuleSnapshot snapshot = currentRuleSnapshot();
+        RuleSnapshot snapshot = currentRuleSnapshot(operator.userId(), workDate);
         LockHandle lock = lockService.acquire(operator.userId(), workDate);
         if (!lock.allowsProceeding()) {
             log.info("attendance.check-in.rejected traceId={} userId={} workDate={} reason=lock-contended",
@@ -319,10 +322,11 @@ public class AttendanceApplicationService {
                     record.getRuleLateThresholdMinutes());
         }
         log.warn("attendance.rule-snapshot.missing recordId={} fallbackUsed=true", record.getId());
-        return currentRuleSnapshot();
+        return currentRuleSnapshot(record.getUserId(), record.getWorkDate());
     }
 
-    private RuleSnapshot currentRuleSnapshot() {
+    private RuleSnapshot currentRuleSnapshot(long userId, LocalDate workDate) {
+        if (scheduleService != null) return scheduleService.resolveRule(userId, workDate);
         return ruleService == null ? properties.snapshot() : ruleService.currentSnapshot();
     }
 

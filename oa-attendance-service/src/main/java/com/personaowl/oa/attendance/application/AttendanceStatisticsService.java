@@ -57,7 +57,9 @@ public class AttendanceStatisticsService {
                 aggregate.getNormalCount(),
                 aggregate.getLateCount(),
                 aggregate.getEarlyLeaveCount(),
-                aggregate.getMissingCheckOutCount());
+                aggregate.getMissingCheckOutCount(),
+                aggregate.getMissingCheckInCount(),
+                aggregate.getAbsentCount());
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +90,9 @@ public class AttendanceStatisticsService {
                 aggregate.getNormalCount(),
                 aggregate.getLateCount(),
                 aggregate.getEarlyLeaveCount(),
-                aggregate.getMissingCheckOutCount());
+                aggregate.getMissingCheckOutCount(),
+                aggregate.getMissingCheckInCount(),
+                aggregate.getAbsentCount());
     }
 
     public StatisticsSummaryResponse getSummary(OperatorContext operator,

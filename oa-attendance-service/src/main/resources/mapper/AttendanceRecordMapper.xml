@@ -22,7 +22,11 @@
                        OR (work_date &lt; #{today}
                            AND check_in_time IS NOT NULL
                            AND check_out_time IS NULL)
-                   THEN 1 ELSE 0 END), 0) AS missingCheckOutCount
+                   THEN 1 ELSE 0 END), 0) AS missingCheckOutCount,
+               COALESCE(SUM(CASE WHEN status = 'MISSING_CHECK_IN' THEN 1 ELSE 0 END), 0)
+                   AS missingCheckInCount,
+               COALESCE(SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END), 0)
+                   AS absentCount
         FROM attendance_record
         WHERE work_date BETWEEN #{startDate} AND #{endDate}
         <if test="userId != null">

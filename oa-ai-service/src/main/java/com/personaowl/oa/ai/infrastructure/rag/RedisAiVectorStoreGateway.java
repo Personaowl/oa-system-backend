@@ -3,7 +3,7 @@ package com.personaowl.oa.ai.infrastructure.rag;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnBean(VectorStore.class)
 public class RedisAiVectorStoreGateway implements AiVectorStoreGateway {
 
     private final VectorStore vectorStore;
@@ -21,7 +20,7 @@ public class RedisAiVectorStoreGateway implements AiVectorStoreGateway {
     }
 
     @Override
-    public void upsert(Long docId, String docTitle, String docVersion, List<String> chunks) {
+    public void upsert(Long docId, String docTitle, String docDomain, String docVersion, List<String> chunks) {
         deleteByDocId(docId);
         List<Document> documents = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
@@ -30,6 +29,7 @@ public class RedisAiVectorStoreGateway implements AiVectorStoreGateway {
                     Map.of(
                             "docId", String.valueOf(docId),
                             "docTitle", docTitle,
+                            "docDomain", docDomain,
                             "docVersion", docVersion,
                             "chunkId", String.valueOf(docId * 1000 + i + 1),
                             "chunkNo", String.valueOf(i + 1)
@@ -40,10 +40,15 @@ public class RedisAiVectorStoreGateway implements AiVectorStoreGateway {
 
     @Override
     public List<AiVectorDocument> search(String question, String knowledgeDomain, int topK) {
-        List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder().query(question).topK(Math.max(1, topK)).build());
+        SearchRequest.Builder request = SearchRequest.builder().query(question).topK(Math.max(1, topK));
+        if (knowledgeDomain != null && !knowledgeDomain.isBlank() && !"ALL".equalsIgnoreCase(knowledgeDomain)) {
+            request.filterExpression(new FilterExpressionBuilder().eq("docDomain", knowledgeDomain.toUpperCase()).build());
+        }
+        List<Document> documents = vectorStore.similaritySearch(request.build());
         return documents.stream().map(doc -> new AiVectorDocument(
                 toLong(doc.getMetadata().get("docId")),
                 string(doc.getMetadata().get("docTitle")),
+                string(doc.getMetadata().get("docDomain")),
                 string(doc.getMetadata().get("docVersion")),
                 toLong(doc.getMetadata().get("chunkId")),
                 toInt(doc.getMetadata().get("chunkNo")),
@@ -54,7 +59,7 @@ public class RedisAiVectorStoreGateway implements AiVectorStoreGateway {
 
     @Override
     public void deleteByDocId(Long docId) {
-        vectorStore.delete(List.of("docId:" + docId));
+        vectorStore.delete(new FilterExpressionBuilder().eq("docId", String.valueOf(docId)).build());
     }
 
     private Long toLong(Object value) {

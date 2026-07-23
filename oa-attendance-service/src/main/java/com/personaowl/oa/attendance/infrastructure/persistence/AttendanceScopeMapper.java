@@ -9,7 +9,14 @@ import java.util.List;
 @Mapper
 public interface AttendanceScopeMapper {
 
-    @Select("SELECT id FROM sys_department WHERE manager_id = #{userId} AND status = 1 AND deleted = 0 ORDER BY sort_order, id")
+    @Select("""
+            SELECT DISTINCT d.id
+            FROM sys_department d
+            LEFT JOIN sys_department_manager dm ON dm.department_id = d.id
+            WHERE (d.manager_id = #{userId} OR dm.user_id = #{userId})
+              AND d.status = 1 AND d.deleted = 0
+            ORDER BY d.sort_order, d.id
+            """)
     List<Long> findManagedDepartmentIds(@Param("userId") long userId);
 
     @Select({"<script>",

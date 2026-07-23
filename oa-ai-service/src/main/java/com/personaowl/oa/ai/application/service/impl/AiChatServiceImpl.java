@@ -1,5 +1,6 @@
 package com.personaowl.oa.ai.application.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.personaowl.oa.ai.application.service.AiChatService;
 import com.personaowl.oa.ai.domain.entity.AiChatLog;
 import com.personaowl.oa.ai.domain.entity.AiChatSession;
@@ -23,13 +24,16 @@ public class AiChatServiceImpl implements AiChatService {
     private final AiChatSessionMapper aiChatSessionMapper;
     private final AiChatLogMapper aiChatLogMapper;
     private final AiRagService aiRagService;
+    private final ObjectMapper objectMapper;
 
     public AiChatServiceImpl(AiChatSessionMapper aiChatSessionMapper,
                              AiChatLogMapper aiChatLogMapper,
-                             AiRagService aiRagService) {
+                             AiRagService aiRagService,
+                             ObjectMapper objectMapper) {
         this.aiChatSessionMapper = aiChatSessionMapper;
         this.aiChatLogMapper = aiChatLogMapper;
         this.aiRagService = aiRagService;
+        this.objectMapper = objectMapper;
     }
 
     /** 匿名用户ID，绕过鉴权时 userId 为 null，使用 0 占位以满足 NOT NULL 约束 */
@@ -48,25 +52,17 @@ public class AiChatServiceImpl implements AiChatService {
     public Flux<String> chatStream(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
         Long uid = requireUserId(userId);
         AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
-        return aiRagService.answerStream(question, knowledgeDomain, topK)
+        StringBuilder streamedAnswer = new StringBuilder();
+        long startedAt = System.nanoTime();
+        AiRagService.StreamResult ragStream = aiRagService.answerStream(question, knowledgeDomain, topK);
+        return ragStream.content()
                 .switchIfEmpty(Flux.just(""))
+                .doOnNext(streamedAnswer::append)
                 .map(token -> buildStreamChunk(session.getId(), token, false))
                 .concatWith(Flux.just(buildStreamChunk(session.getId(), "", true)))
                 .concatWith(Flux.just("data: [DONE]\n\n"))
-                .doOnComplete(() -> persistStreamChat(uid, traceId, question, session, knowledgeDomain, topK));
-    }
-
-    @Override
-    public Flux<String> streamOpenAiLike(AiChatResponseVO response) {
-        String content = response.answer() == null ? "" : response.answer();
-        String model = "Pro/zai-org/GLM-4.7";
-        long created = java.time.Instant.now().getEpochSecond();
-        String id = java.util.UUID.randomUUID().toString();
-        return Flux.concat(
-                Flux.just(sseChunk(openAiChunk(id, created, model, "assistant", content, null))),
-                Flux.just(sseChunk(openAiChunk(id, created + 1, model, null, null, "stop"))),
-                Flux.just("data: [DONE]\n\n")
-        );
+                .doOnComplete(() -> persistStreamChat(uid, question, session, knowledgeDomain, topK,
+                        streamedAnswer.toString(), ragStream, elapsedMs(startedAt)));
     }
 
     private String buildStreamChunk(Long sessionId, String token, boolean done) {
@@ -86,39 +82,33 @@ public class AiChatServiceImpl implements AiChatService {
         return "data: " + sb;
     }
 
-    private void persistStreamChat(Long userId, String traceId, String question, AiChatSession session, String knowledgeDomain, Integer topK) {
-        AiChatResponseVO response = doChat(userId, traceId, question, session.getId(), knowledgeDomain, topK);
-        session.setLatestAnswer(response.answer());
+    private void persistStreamChat(Long userId,
+                                   String question,
+                                   AiChatSession session,
+                                   String knowledgeDomain,
+                                   Integer topK,
+                                   String answer,
+                                   AiRagService.StreamResult ragResult,
+                                   int latencyMs) {
+        AiChatLog log = new AiChatLog();
+        log.setSessionId(session.getId());
+        log.setUserId(userId);
+        log.setQuestion(question);
+        log.setAnswer(answer);
+        log.setKnowledgeDomain(normalizeDomain(knowledgeDomain));
+        applyRagMetadata(log, ragResult.matchedDocs(), ragResult.citations(),
+                ragResult.hitFlag(), ragResult.confidenceScore());
+        log.setModelName("Pro/deepseek-ai/DeepSeek-V3.2");
+        log.setTopK(topK == null ? 3 : topK);
+        log.setLatencyMs(latencyMs);
+        log.setCreatedAt(LocalDateTime.now());
+        aiChatLogMapper.insert(log);
+
+        session.setLatestQuestion(question);
+        session.setLatestAnswer(answer);
+        session.setMessageCount((session.getMessageCount() == null ? 0 : session.getMessageCount()) + 2);
+        session.setUpdatedAt(LocalDateTime.now());
         aiChatSessionMapper.updateById(session);
-    }
-
-    private String openAiChunk(String id, long created, String model, String role, String content, String finishReason) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\"id\":\"").append(id).append("\",")
-                .append("\"object\":\"chat.completion.chunk\",")
-                .append("\"created\":").append(created).append(',')
-                .append("\"model\":\"").append(model).append("\",")
-                .append("\"choices\":[{")
-                .append("\"index\":0,")
-                .append("\"delta\":{");
-        boolean hasDelta = false;
-        if (role != null) {
-            sb.append("\"role\":\"").append(role).append("\"");
-            hasDelta = true;
-        }
-        if (content != null) {
-            if (hasDelta) sb.append(',');
-            sb.append("\"content\":\"").append(escapeJson(content)).append("\"");
-            hasDelta = true;
-        }
-        sb.append("},\"");
-        sb.append("finish_reason\":").append(finishReason == null ? "null" : "\"" + finishReason + "\"");
-        sb.append("}]}" );
-        return sb.toString();
-    }
-
-    private String sseChunk(String json) {
-        return "data: " + json + "\n\n";
     }
 
     private String escapeJson(String text) {
@@ -128,6 +118,7 @@ public class AiChatServiceImpl implements AiChatService {
     private AiChatResponseVO doChat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
         Long uid = requireUserId(userId);
         AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
+        long startedAt = System.nanoTime();
         AiRagService.RagResult ragResult = aiRagService.answer(question, knowledgeDomain, topK);
 
         AiChatLog log = new AiChatLog();
@@ -135,14 +126,12 @@ public class AiChatServiceImpl implements AiChatService {
         log.setUserId(uid);
         log.setQuestion(question);
         log.setAnswer(ragResult.answer());
-        log.setRetrievedDocIds("1");
-        log.setRetrievedChunkIds("1");
-        log.setCitationsJson("[]");
-        log.setModelName("deepseek-ai");
+        log.setKnowledgeDomain(normalizeDomain(knowledgeDomain));
+        applyRagMetadata(log, ragResult.matchedDocs(), ragResult.citations(),
+                ragResult.hitFlag(), ragResult.confidenceScore());
+        log.setModelName("Pro/deepseek-ai/DeepSeek-V3.2");
         log.setTopK(topK == null ? 3 : topK);
-        log.setConfidenceScore(BigDecimal.valueOf(ragResult.confidenceScore()));
-        log.setHitFlag(ragResult.hitFlag() ? 1 : 0);
-        log.setLatencyMs(10);
+        log.setLatencyMs(elapsedMs(startedAt));
         log.setCreatedAt(LocalDateTime.now());
         aiChatLogMapper.insert(log);
 
@@ -250,9 +239,60 @@ public class AiChatServiceImpl implements AiChatService {
 
     private AiChatLogVO toVO(AiChatLog log) {
         return new AiChatLogVO(log.getId(), log.getSessionId(), log.getUserId(), log.getQuestion(), log.getAnswer(),
-                List.of(), log.getModelName(), log.getTopK(),
+                log.getKnowledgeDomain(), parseCitations(log.getCitationsJson()), log.getModelName(), log.getTopK(),
                 log.getConfidenceScore() == null ? null : log.getConfidenceScore().doubleValue(), log.getHitFlag() != null && log.getHitFlag() == 1,
                 log.getLatencyMs(), log.getCreatedAt() == null ? null : log.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(8)));
+    }
+
+    private void applyRagMetadata(AiChatLog log,
+                                  List<AiRagService.MatchedDoc> matchedDocs,
+                                  List<AiRagService.Citation> citations,
+                                  boolean hitFlag,
+                                  double confidenceScore) {
+        log.setRetrievedDocIds(matchedDocs.stream()
+                .map(doc -> String.valueOf(doc.docId()))
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(",")));
+        log.setRetrievedChunkIds(citations.stream()
+                .map(citation -> String.valueOf(citation.chunkId()))
+                .collect(java.util.stream.Collectors.joining(",")));
+        log.setCitationsJson(writeCitations(citations));
+        log.setConfidenceScore(BigDecimal.valueOf(confidenceScore));
+        log.setHitFlag(hitFlag ? 1 : 0);
+    }
+
+    private String writeCitations(List<AiRagService.Citation> citations) {
+        try {
+            return objectMapper.writeValueAsString(citations);
+        } catch (Exception ex) {
+            return "[]";
+        }
+    }
+
+    private List<AiChatResponseVO.CitationVO> parseCitations(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            AiRagService.Citation[] citations = objectMapper.readValue(json, AiRagService.Citation[].class);
+            return java.util.Arrays.stream(citations)
+                    .map(c -> new AiChatResponseVO.CitationVO(c.docId(), c.docTitle(), c.chunkId(),
+                            c.chunkNo(), c.snippet(), c.score()))
+                    .toList();
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private String normalizeDomain(String knowledgeDomain) {
+        return knowledgeDomain == null || knowledgeDomain.isBlank()
+                ? "ALL"
+                : knowledgeDomain.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private int elapsedMs(long startedAt) {
+        long elapsed = (System.nanoTime() - startedAt) / 1_000_000L;
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(1L, elapsed));
     }
 
     private java.time.OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,7 +61,7 @@ class AiKnowledgeDocServiceImplTest {
         assertNotNull(vo);
         verify(docMapper).insert(any());
         verify(chunkMapper).insertBatch(anyList());
-        verify(vectorStoreGateway).upsert(any(), any(), any(), anyList());
+        verify(vectorStoreGateway, never()).upsert(any(), any(), any(), any(), anyList());
     }
 
     @Test
@@ -68,6 +69,7 @@ class AiKnowledgeDocServiceImplTest {
         AiKnowledgeDoc doc = new AiKnowledgeDoc();
         doc.setId(1L);
         doc.setDocTitle("考勤制度");
+        doc.setDocDomain("ATTENDANCE");
         doc.setDocVersion("v1.0");
         doc.setStatus("DRAFT");
         doc.setCreatedAt(LocalDateTime.now());
@@ -78,6 +80,6 @@ class AiKnowledgeDocServiceImplTest {
         AiKnowledgeDocVO vo = service.approve(1L, 1L, "ok");
 
         assertEquals("APPROVED", vo.status());
-        verify(vectorStoreGateway).upsert(any(), any(), any(), anyList());
+        verify(vectorStoreGateway).upsert(any(), any(), any(), any(), anyList());
     }
 }

@@ -10,8 +10,6 @@ public interface AiChatService {
 
     AiChatResponseVO chat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK, Boolean stream);
     Flux<String> chatStream(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK);
-    Flux<String> streamOpenAiLike(AiChatResponseVO response);
-
     PageResultVO<AiChatSessionVO> pageSessions(Long userId, Integer page, Integer size, String keyword, String status);
 
     AiChatSessionVO getSession(Long userId, Long sessionId);

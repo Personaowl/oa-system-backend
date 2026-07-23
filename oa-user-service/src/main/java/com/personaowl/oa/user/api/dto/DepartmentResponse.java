@@ -51,6 +51,10 @@ public record DepartmentResponse(
      */
     LocalDateTime updatedAt,
 
+    Long managerId,
+
+    List<Long> managerIds,
+
     long employeeCount,
 
     List<String> managerNames
@@ -71,15 +75,31 @@ public record DepartmentResponse(
             department.getStatus(),
             department.getCreatedAt(),
             department.getUpdatedAt(),
+            department.getManagerId(),
+            department.getManagerId() == null ? List.of() : List.of(department.getManagerId()),
             0,
             List.of()
         );
     }
 
-    public static DepartmentResponse from(SysDepartment department, long employeeCount, List<String> managerNames) {
+    public DepartmentResponse(
+            Long id, Long parentId, String name, Integer sortOrder, Integer status,
+            LocalDateTime createdAt, LocalDateTime updatedAt, long employeeCount,
+            List<String> managerNames) {
+        this(id, parentId, name, sortOrder, status, createdAt, updatedAt,
+                null, List.of(), employeeCount, managerNames);
+    }
+
+    public static DepartmentResponse from(
+            SysDepartment department,
+            List<Long> managerIds,
+            long employeeCount,
+            List<String> managerNames) {
         return new DepartmentResponse(
                 department.getId(), department.getParentId(), department.getName(), department.getSortOrder(),
                 department.getStatus(), department.getCreatedAt(), department.getUpdatedAt(),
+                department.getManagerId(),
+                managerIds == null ? List.of() : List.copyOf(managerIds),
                 employeeCount, managerNames == null ? List.of() : List.copyOf(managerNames));
     }
 }

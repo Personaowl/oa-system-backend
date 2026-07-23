@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 /**
  * 更新部门请求参数。
  *
@@ -31,6 +33,10 @@ public record DepartmentUpdateRequest(
     @Min(value = 1, message = "负责人ID必须是正整数")
     Long managerId,
 
+    /** 可选的协同主管用户 ID，主负责人无需重复传入。 */
+    @Size(max = 10, message = "一个部门最多配置10名协同主管")
+    List<@Min(value = 1, message = "协同主管ID必须是正整数") Long> assistantManagerIds,
+
     /**
      * 排序号，数值越小越靠前。
      */
@@ -47,6 +53,11 @@ public record DepartmentUpdateRequest(
     Integer status
 ) {
     public DepartmentUpdateRequest(Long parentId, String name, Integer sortOrder, Integer status) {
-        this(parentId, name, null, sortOrder, status);
+        this(parentId, name, null, List.of(), sortOrder, status);
+    }
+
+    public DepartmentUpdateRequest(
+            Long parentId, String name, Long managerId, Integer sortOrder, Integer status) {
+        this(parentId, name, managerId, List.of(), sortOrder, status);
     }
 }

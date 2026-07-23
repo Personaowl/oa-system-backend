@@ -1,6 +1,9 @@
 server.port: ${AI_SERVICE_PORT:8105}
 spring:
   application.name: oa-ai-service
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
   config.import:
     - optional:nacos:oa-common.yaml?group=DEFAULT_GROUP&refreshEnabled=true
     - optional:nacos:${spring.application.name}.yaml?group=DEFAULT_GROUP&refreshEnabled=true
@@ -24,9 +27,17 @@ spring:
       encoding: UTF-8
       schema-locations: classpath:schema-ai.sql
   ai:
+    model:
+      chat: openai
+      embedding: openai
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
     openai:
       base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
-      api-key: ${SILICONFLOW_API_KEY:}
+      api-key: sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq
       chat.options.model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
       embedding.options.model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
     vectorstore:
@@ -51,6 +62,6 @@ ai:
     chat-model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
     embedding-model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
     base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
-    api-key: ${SILICONFLOW_API_KEY:}
+    api-key: sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq
     redis-host: ${REDIS_HOST:127.0.0.1}
     redis-port: ${REDIS_PORT:6379}

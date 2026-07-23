@@ -9,6 +9,7 @@ public record AiChatLogVO(
         Long userId,
         String question,
         String answer,
+        String knowledgeDomain,
         List<AiChatResponseVO.CitationVO> citations,
         String modelName,
         Integer topK,
@@ -18,6 +19,6 @@ public record AiChatLogVO(
         OffsetDateTime createdAt) {
 
     public static AiChatLogVO empty(Long id) {
-        return new AiChatLogVO(id, null, null, null, null, List.of(), null, null, null, null, null, null);
+        return new AiChatLogVO(id, null, null, null, null, null, List.of(), null, null, null, null, null, null);
     }
 }
