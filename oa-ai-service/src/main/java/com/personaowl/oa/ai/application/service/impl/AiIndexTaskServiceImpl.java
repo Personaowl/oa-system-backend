@@ -22,7 +22,7 @@ public class AiIndexTaskServiceImpl implements AiIndexTaskService {
     public PageResultVO<AiIndexTaskVO> page(Integer page, Integer size, String status, String taskType, Long docId) {
         List<AiIndexTask> tasks = aiIndexTaskMapper.selectPage(status, taskType, docId, offset(page, size), size == null ? 20 : size);
         List<AiIndexTaskVO> vos = tasks.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, page, size, (long) vos.size());
+        return new PageResultVO<>(vos, page, size, (int) vos.size());
     }
 
     @Override

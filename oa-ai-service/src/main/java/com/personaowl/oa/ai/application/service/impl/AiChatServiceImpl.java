@@ -11,6 +11,7 @@ import com.personaowl.oa.ai.infrastructure.mapper.AiChatLogMapper;
 import com.personaowl.oa.ai.infrastructure.mapper.AiChatSessionMapper;
 import com.personaowl.oa.ai.infrastructure.rag.AiRagService;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,6 +41,91 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public AiChatResponseVO chat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK, Boolean stream) {
+        return doChat(userId, traceId, question, sessionId, knowledgeDomain, topK);
+    }
+
+    @Override
+    public Flux<String> chatStream(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
+        Long uid = requireUserId(userId);
+        AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
+        return aiRagService.answerStream(question, knowledgeDomain, topK)
+                .switchIfEmpty(Flux.just(""))
+                .map(token -> buildStreamChunk(session.getId(), token, false))
+                .concatWith(Flux.just(buildStreamChunk(session.getId(), "", true)))
+                .concatWith(Flux.just("data: [DONE]\n\n"))
+                .doOnComplete(() -> persistStreamChat(uid, traceId, question, session, knowledgeDomain, topK));
+    }
+
+    @Override
+    public Flux<String> streamOpenAiLike(AiChatResponseVO response) {
+        String content = response.answer() == null ? "" : response.answer();
+        String model = "Pro/zai-org/GLM-4.7";
+        long created = java.time.Instant.now().getEpochSecond();
+        String id = java.util.UUID.randomUUID().toString();
+        return Flux.concat(
+                Flux.just(sseChunk(openAiChunk(id, created, model, "assistant", content, null))),
+                Flux.just(sseChunk(openAiChunk(id, created + 1, model, null, null, "stop"))),
+                Flux.just("data: [DONE]\n\n")
+        );
+    }
+
+    private String buildStreamChunk(Long sessionId, String token, boolean done) {
+        String id = java.util.UUID.randomUUID().toString();
+        long created = java.time.Instant.now().getEpochSecond();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"id\":\"").append(id).append("\",")
+                .append("\"object\":\"chat.completion.chunk\",")
+                .append("\"created\":").append(created).append(',')
+                .append("\"model\":\"Pro/zai-org/GLM-4.7\",")
+                .append("\"sessionId\":").append(sessionId).append(',')
+                .append("\"choices\":[{\"index\":0,\"delta\":{");
+        if (!done) {
+            sb.append("\"role\":\"assistant\",\"content\":\"").append(escapeJson(token)).append("\"");
+        }
+        sb.append("},\"finish_reason\":").append(done ? "\"stop\"" : "null").append("}]}\n\n");
+        return "data: " + sb;
+    }
+
+    private void persistStreamChat(Long userId, String traceId, String question, AiChatSession session, String knowledgeDomain, Integer topK) {
+        AiChatResponseVO response = doChat(userId, traceId, question, session.getId(), knowledgeDomain, topK);
+        session.setLatestAnswer(response.answer());
+        aiChatSessionMapper.updateById(session);
+    }
+
+    private String openAiChunk(String id, long created, String model, String role, String content, String finishReason) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"id\":\"").append(id).append("\",")
+                .append("\"object\":\"chat.completion.chunk\",")
+                .append("\"created\":").append(created).append(',')
+                .append("\"model\":\"").append(model).append("\",")
+                .append("\"choices\":[{")
+                .append("\"index\":0,")
+                .append("\"delta\":{");
+        boolean hasDelta = false;
+        if (role != null) {
+            sb.append("\"role\":\"").append(role).append("\"");
+            hasDelta = true;
+        }
+        if (content != null) {
+            if (hasDelta) sb.append(',');
+            sb.append("\"content\":\"").append(escapeJson(content)).append("\"");
+            hasDelta = true;
+        }
+        sb.append("},\"");
+        sb.append("finish_reason\":").append(finishReason == null ? "null" : "\"" + finishReason + "\"");
+        sb.append("}]}" );
+        return sb.toString();
+    }
+
+    private String sseChunk(String json) {
+        return "data: " + json + "\n\n";
+    }
+
+    private String escapeJson(String text) {
+        return text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private AiChatResponseVO doChat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
         Long uid = requireUserId(userId);
         AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
         AiRagService.RagResult ragResult = aiRagService.answer(question, knowledgeDomain, topK);
@@ -75,15 +161,19 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public PageResultVO<AiChatSessionVO> pageSessions(Long userId, Integer page, Integer size, String keyword, String status) {
-        List<AiChatSession> sessions = aiChatSessionMapper.selectPage(userId, keyword, status, offset(page, size), size == null ? 20 : size);
+        Long uid = requireUserId(userId);
+        List<AiChatSession> sessions = aiChatSessionMapper.selectPage(uid, keyword, status, offset(page, size), size == null ? 20 : size);
         List<AiChatSessionVO> vos = sessions.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, page, size, (long) vos.size());
+        return new PageResultVO<>(vos, page, size, vos.size());
     }
 
     @Override
     public AiChatSessionVO getSession(Long userId, Long sessionId) {
         AiChatSession session = aiChatSessionMapper.selectById(sessionId);
-        return session == null ? AiChatSessionVO.empty(sessionId) : toVO(session);
+        if (session == null) {
+            return AiChatSessionVO.empty(sessionId);
+        }
+        return toVO(session, aiChatLogMapper.selectBySessionId(sessionId));
     }
 
     @Override
@@ -112,7 +202,7 @@ public class AiChatServiceImpl implements AiChatService {
     public PageResultVO<AiChatLogVO> pageLogs(Long userId, Integer page, Integer size, Long queryUserId, String keyword, String knowledgeDomain, Boolean hitFlag) {
         List<AiChatLog> logs = aiChatLogMapper.selectPage(userId, queryUserId, keyword, knowledgeDomain, hitFlag == null ? null : (hitFlag ? 1 : 0), offset(page, size), size == null ? 20 : size);
         List<AiChatLogVO> vos = logs.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, page, size, (long) vos.size());
+        return new PageResultVO<>(vos, page, size, vos.size());
     }
 
     @Override
@@ -144,9 +234,18 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private AiChatSessionVO toVO(AiChatSession session) {
+        return toVO(session, List.of());
+    }
+
+    private AiChatSessionVO toVO(AiChatSession session, List<AiChatLog> logs) {
+        List<AiChatSessionVO.AiChatMessageVO> messages = logs.stream()
+                .flatMap(log -> java.util.stream.Stream.of(
+                        new AiChatSessionVO.AiChatMessageVO("user", log.getQuestion(), List.of(), toOffsetDateTime(log.getCreatedAt())),
+                        new AiChatSessionVO.AiChatMessageVO("assistant", log.getAnswer(), List.of(), toOffsetDateTime(log.getCreatedAt()))))
+                .toList();
         return new AiChatSessionVO(session.getId(), session.getSessionNo(), session.getSessionTitle(), session.getKnowledgeDomain(),
                 session.getLatestQuestion(), session.getLatestAnswer(), session.getMessageCount(), session.getStatus(),
-                session.getCreatedAt() == null ? null : session.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(8)), List.of());
+                toOffsetDateTime(session.getCreatedAt()), messages);
     }
 
     private AiChatLogVO toVO(AiChatLog log) {
@@ -154,6 +253,10 @@ public class AiChatServiceImpl implements AiChatService {
                 List.of(), log.getModelName(), log.getTopK(),
                 log.getConfidenceScore() == null ? null : log.getConfidenceScore().doubleValue(), log.getHitFlag() != null && log.getHitFlag() == 1,
                 log.getLatencyMs(), log.getCreatedAt() == null ? null : log.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(8)));
+    }
+
+    private java.time.OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.atOffset(java.time.ZoneOffset.ofHours(8));
     }
 
     private int offset(Integer page, Integer size) {

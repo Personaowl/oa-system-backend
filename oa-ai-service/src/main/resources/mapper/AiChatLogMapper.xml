@@ -34,6 +34,13 @@
         SELECT * FROM ai_chat_log WHERE id = #{id}
     </select>
 
+    <select id="selectBySessionId" resultMap="BaseResultMap">
+        SELECT *
+        FROM ai_chat_log
+        WHERE session_id = #{sessionId}
+        ORDER BY created_at ASC, id ASC
+    </select>
+
     <select id="selectPage" resultMap="BaseResultMap">
         SELECT *
         FROM ai_chat_log

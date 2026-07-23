@@ -89,7 +89,7 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
         int s = safeSize(size);
         List<AiKnowledgeDoc> docs = aiKnowledgeDocMapper.selectPage(keyword, docDomain == null ? null : docDomain.toUpperCase(Locale.ROOT), status, offset(p, s), s);
         List<AiKnowledgeDocVO> list = docs.stream().map(this::toVO).toList();
-        return new PageResultVO<>(list, p, s, (long) list.size());
+        return new PageResultVO<>(list, p, s, (int) list.size());
     }
 
     @Override
@@ -188,7 +188,7 @@ public class AiKnowledgeDocServiceImpl implements AiKnowledgeDocService {
         int s = safeSize(size);
         List<AiKnowledgeChunk> chunks = aiKnowledgeChunkMapper.selectByDocId(docId);
         List<AiKnowledgeChunkVO> vos = chunks == null ? Collections.emptyList() : chunks.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, p, s, (long) vos.size());
+        return new PageResultVO<>(vos, p, s, (int) vos.size());
     }
 
     private void parseAndPersistDocument(AiKnowledgeDoc entity, byte[] fileBytes, String fileName) {
