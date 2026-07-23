@@ -40,11 +40,10 @@ public class AiChatController {
     }
 
     @PostMapping(value = "/chats/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<AiChatResponseVO> chatStream(@RequestHeader(value = "X-Trace-Id", required = false) String traceId,
-                                             @Valid @RequestBody AiChatRequestDTO request) {
+    public Flux<String> chatStream(@RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                   @Valid @RequestBody AiChatRequestDTO request) {
         Long userId = null;
-        AiChatResponseVO response = aiChatService.chat(userId, traceId, request.question(), toLong(request.sessionId()), request.knowledgeDomain(), request.topK(), true);
-        return Flux.just(response);
+        return aiChatService.chatStream(userId, traceId, request.question(), toLong(request.sessionId()), request.knowledgeDomain(), request.topK());
     }
 
     @GetMapping("/chat-sessions")

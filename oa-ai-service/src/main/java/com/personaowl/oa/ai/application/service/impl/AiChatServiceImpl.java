@@ -11,6 +11,7 @@ import com.personaowl.oa.ai.infrastructure.mapper.AiChatLogMapper;
 import com.personaowl.oa.ai.infrastructure.mapper.AiChatSessionMapper;
 import com.personaowl.oa.ai.infrastructure.rag.AiRagService;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,6 +41,91 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public AiChatResponseVO chat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK, Boolean stream) {
+        return doChat(userId, traceId, question, sessionId, knowledgeDomain, topK);
+    }
+
+    @Override
+    public Flux<String> chatStream(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
+        Long uid = requireUserId(userId);
+        AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
+        return aiRagService.answerStream(question, knowledgeDomain, topK)
+                .switchIfEmpty(Flux.just(""))
+                .map(token -> buildStreamChunk(session.getId(), token, false))
+                .concatWith(Flux.just(buildStreamChunk(session.getId(), "", true)))
+                .concatWith(Flux.just("data: [DONE]\n\n"))
+                .doOnComplete(() -> persistStreamChat(uid, traceId, question, session, knowledgeDomain, topK));
+    }
+
+    @Override
+    public Flux<String> streamOpenAiLike(AiChatResponseVO response) {
+        String content = response.answer() == null ? "" : response.answer();
+        String model = "Pro/zai-org/GLM-4.7";
+        long created = java.time.Instant.now().getEpochSecond();
+        String id = java.util.UUID.randomUUID().toString();
+        return Flux.concat(
+                Flux.just(sseChunk(openAiChunk(id, created, model, "assistant", content, null))),
+                Flux.just(sseChunk(openAiChunk(id, created + 1, model, null, null, "stop"))),
+                Flux.just("data: [DONE]\n\n")
+        );
+    }
+
+    private String buildStreamChunk(Long sessionId, String token, boolean done) {
+        String id = java.util.UUID.randomUUID().toString();
+        long created = java.time.Instant.now().getEpochSecond();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"id\":\"").append(id).append("\",")
+                .append("\"object\":\"chat.completion.chunk\",")
+                .append("\"created\":").append(created).append(',')
+                .append("\"model\":\"Pro/zai-org/GLM-4.7\",")
+                .append("\"sessionId\":").append(sessionId).append(',')
+                .append("\"choices\":[{\"index\":0,\"delta\":{");
+        if (!done) {
+            sb.append("\"role\":\"assistant\",\"content\":\"").append(escapeJson(token)).append("\"");
+        }
+        sb.append("},\"finish_reason\":").append(done ? "\"stop\"" : "null").append("}]}\n\n");
+        return "data: " + sb;
+    }
+
+    private void persistStreamChat(Long userId, String traceId, String question, AiChatSession session, String knowledgeDomain, Integer topK) {
+        AiChatResponseVO response = doChat(userId, traceId, question, session.getId(), knowledgeDomain, topK);
+        session.setLatestAnswer(response.answer());
+        aiChatSessionMapper.updateById(session);
+    }
+
+    private String openAiChunk(String id, long created, String model, String role, String content, String finishReason) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"id\":\"").append(id).append("\",")
+                .append("\"object\":\"chat.completion.chunk\",")
+                .append("\"created\":").append(created).append(',')
+                .append("\"model\":\"").append(model).append("\",")
+                .append("\"choices\":[{")
+                .append("\"index\":0,")
+                .append("\"delta\":{");
+        boolean hasDelta = false;
+        if (role != null) {
+            sb.append("\"role\":\"").append(role).append("\"");
+            hasDelta = true;
+        }
+        if (content != null) {
+            if (hasDelta) sb.append(',');
+            sb.append("\"content\":\"").append(escapeJson(content)).append("\"");
+            hasDelta = true;
+        }
+        sb.append("},\"");
+        sb.append("finish_reason\":").append(finishReason == null ? "null" : "\"" + finishReason + "\"");
+        sb.append("}]}" );
+        return sb.toString();
+    }
+
+    private String sseChunk(String json) {
+        return "data: " + json + "\n\n";
+    }
+
+    private String escapeJson(String text) {
+        return text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    }
+
+    private AiChatResponseVO doChat(Long userId, String traceId, String question, Long sessionId, String knowledgeDomain, Integer topK) {
         Long uid = requireUserId(userId);
         AiChatSession session = resolveSession(uid, sessionId, question, knowledgeDomain);
         AiRagService.RagResult ragResult = aiRagService.answer(question, knowledgeDomain, topK);
