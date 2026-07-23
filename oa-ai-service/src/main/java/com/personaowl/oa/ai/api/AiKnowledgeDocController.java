@@ -45,7 +45,7 @@ public class AiKnowledgeDocController {
     public AiKnowledgeDocVO create(@RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
                                    @RequestPart("file") MultipartFile file,
                                    @Valid AiKnowledgeDocCreateDTO request) {
-        return aiKnowledgeDocService.create(defaultUserId(userId), request.docTitle(), request.docDomain(), request.docVersion(), request.effectiveDate(), request.sourceType(), file.getOriginalFilename(), new byte[0]);
+        return aiKnowledgeDocService.create(defaultUserId(userId), file, request.docTitle(), request.docDomain(), request.docVersion(), request.effectiveDate(), request.sourceType());
     }
 
     @GetMapping
