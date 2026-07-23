@@ -4,12 +4,14 @@ CREATE TABLE IF NOT EXISTS sys_department (
     id BIGINT PRIMARY KEY COMMENT '部门主键',
     parent_id BIGINT NOT NULL DEFAULT 0 COMMENT '父部门ID，0表示根部门',
     name VARCHAR(64) NOT NULL COMMENT '部门名称',
+    manager_id BIGINT NULL COMMENT '部门负责人用户ID',
     sort_order INT NOT NULL DEFAULT 0 COMMENT '部门排序号，数值越小越靠前',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记：0未删除，1已删除',
-    UNIQUE KEY uk_department_parent_name (parent_id, name)
+    UNIQUE KEY uk_department_parent_name (parent_id, name),
+    KEY idx_department_manager (manager_id)
 ) COMMENT='部门';
 
 CREATE TABLE IF NOT EXISTS sys_user (
@@ -18,8 +20,10 @@ CREATE TABLE IF NOT EXISTS sys_user (
     username VARCHAR(64) NOT NULL COMMENT '登录用户名',
     password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希值',
     display_name VARCHAR(64) NOT NULL COMMENT '用户显示名称',
+    avatar_file_name VARCHAR(255) NULL COMMENT '本地头像文件名',
     phone VARCHAR(32) NULL COMMENT '手机号',
     email VARCHAR(128) NULL COMMENT '邮箱地址',
+    salary DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT '月基本薪资',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -76,6 +80,15 @@ CREATE TABLE IF NOT EXISTS attendance_record (
     UNIQUE KEY uk_attendance_user_date (user_id, work_date)
 ) COMMENT='考勤记录';
 
+CREATE TABLE IF NOT EXISTS attendance_rule (
+    id BIGINT PRIMARY KEY COMMENT '规则主键，当前固定为1',
+    work_start TIME NOT NULL COMMENT '上班时间',
+    work_end TIME NOT NULL COMMENT '下班时间',
+    late_threshold_minutes INT NOT NULL DEFAULT 5 COMMENT '迟到宽限分钟数',
+    updated_by BIGINT NULL COMMENT '最后修改人ID',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) COMMENT='当前考勤规则';
+
 CREATE TABLE IF NOT EXISTS flow_request (
     id BIGINT PRIMARY KEY COMMENT '流程申请主键',
     applicant_id BIGINT NOT NULL COMMENT '申请人ID',
@@ -89,6 +102,17 @@ CREATE TABLE IF NOT EXISTS flow_request (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     KEY idx_flow_applicant_status (applicant_id, status)
 ) COMMENT='请假与加班申请';
+
+CREATE TABLE IF NOT EXISTS flow_action_log (
+    id BIGINT PRIMARY KEY COMMENT '审批操作日志主键',
+    request_id BIGINT NOT NULL COMMENT '流程申请ID',
+    operator_id BIGINT NOT NULL COMMENT '审批人ID',
+    action VARCHAR(32) NOT NULL COMMENT '审批动作：APPROVE/REJECT',
+    comment VARCHAR(500) NULL COMMENT '审批意见',
+    operated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    KEY idx_flow_action_request (request_id, operated_at),
+    KEY idx_flow_action_operator (operator_id, operated_at)
+) COMMENT='审批操作日志';
 
 CREATE TABLE IF NOT EXISTS notice (
     id BIGINT PRIMARY KEY COMMENT '公告主键',

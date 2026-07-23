@@ -87,12 +87,14 @@ class NoticeServiceImplTest {
         notice.setTitle("已发布公告");
         notice.setStatus(NoticeStatus.PUBLISHED.name());
         notice.setDeleted(0);
+        when(noticeMapper.selectCount(any())).thenReturn(1L);
         when(noticeMapper.selectList(any())).thenReturn(List.of(notice));
         when(noticeReadMapper.existsByNoticeIdAndUserId(1L, 200L)).thenReturn(false);
 
         var result = noticeService.listPublished(null, 200L);
 
         assertEquals(1, result.getRecords().size());
+        assertEquals(1L, result.getTotal());
         assertEquals("已发布公告", result.getRecords().get(0).getTitle());
         assertFalse(result.getRecords().get(0).isRead());
     }

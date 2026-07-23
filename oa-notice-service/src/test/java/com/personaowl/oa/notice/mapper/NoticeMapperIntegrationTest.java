@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @ActiveProfiles("local")
+@Transactional
 class NoticeMapperIntegrationTest {
     @Autowired
     private NoticeMapper noticeMapper;
@@ -27,6 +29,7 @@ class NoticeMapperIntegrationTest {
     void shouldInsertAndQueryNoticeAndReadState() {
         long noticeId = System.currentTimeMillis();
         long userId = 9988L;
+        long unreadBefore = noticeReadMapper.countUnreadByUser(userId);
 
         Notice notice = new Notice();
         notice.setId(noticeId);
@@ -55,6 +58,6 @@ class NoticeMapperIntegrationTest {
         noticeReadMapper.insert(read);
 
         assertTrue(noticeReadMapper.existsByNoticeIdAndUserId(noticeId, userId));
-        assertEquals(0L, noticeReadMapper.countUnreadByUser(userId));
+        assertEquals(unreadBefore, noticeReadMapper.countUnreadByUser(userId));
     }
 }

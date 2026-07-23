@@ -7,6 +7,7 @@ public record CurrentUserResponse(
         Long departmentId,
         String username,
         String displayName,
+        String avatarUrl,
         String phone,
         String email,
         Set<String> roles,

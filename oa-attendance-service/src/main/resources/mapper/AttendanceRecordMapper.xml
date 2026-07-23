@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.personaowl.oa.attendance.infrastructure.persistence.AttendanceRecordMapper">
+
+    <select id="aggregateStatistics"
+            resultType="com.personaowl.oa.attendance.infrastructure.persistence.AttendanceStatisticsAggregate">
+        SELECT COUNT(*) AS totalRecords,
+               COUNT(DISTINCT user_id) AS totalUsers,
+               COALESCE(SUM(CASE WHEN status = 'NORMAL' THEN 1 ELSE 0 END), 0) AS normalCount,
+               COALESCE(SUM(CASE
+                   WHEN late_minutes > 0
+                       OR status IN ('IN_PROGRESS_LATE', 'LATE', 'LATE_AND_EARLY_LEAVE')
+                   THEN 1 ELSE 0 END), 0) AS lateCount,
+               COALESCE(SUM(CASE
+                   WHEN early_leave_minutes > 0
+                       OR status IN ('EARLY_LEAVE', 'LATE_AND_EARLY_LEAVE')
+                   THEN 1 ELSE 0 END), 0) AS earlyLeaveCount,
+               COALESCE(SUM(CASE
+                   WHEN status = 'MISSING_CHECK_OUT'
+                       OR (work_date &lt; #{today}
+                           AND check_in_time IS NOT NULL
+                           AND check_out_time IS NULL)
+                   THEN 1 ELSE 0 END), 0) AS missingCheckOutCount
+        FROM attendance_record
+        WHERE work_date BETWEEN #{startDate} AND #{endDate}
+        <if test="userId != null">
+            AND user_id = #{userId}
+        </if>
+        <if test="departmentIds != null and !departmentIds.isEmpty()">
+            AND user_id IN (
+            SELECT id FROM sys_user
+            WHERE status = 1 AND deleted = 0 AND department_id IN
+            <foreach collection="departmentIds" item="departmentId" open="(" separator="," close=")">
+                #{departmentId}
+            </foreach>
+            )
+        </if>
+    </select>
+
+</mapper>

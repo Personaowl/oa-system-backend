@@ -7,6 +7,12 @@ public enum ErrorCode {
     FORBIDDEN("A0201", "无权执行该操作"),
     INVALID_ARGUMENT("B0101", "请求参数不正确"),
     BUSINESS_RULE_VIOLATION("B0102", "业务规则校验失败"),
+    ATTENDANCE_ALREADY_CHECKED_IN("B0110", "今日已完成上班打卡"),
+    ATTENDANCE_ALREADY_CHECKED_OUT("B0111", "今日已完成下班打卡"),
+    ATTENDANCE_CHECK_IN_REQUIRED("B0112", "请先完成上班打卡"),
+    ATTENDANCE_REQUEST_IN_PROGRESS("B0114", "考勤请求处理中，请稍后重试"),
+    APPROVAL_STATE_INVALID("B0201", "当前单据状态不可审批"),
+    REDIS_UNAVAILABLE("C0102", "缓存服务不可用"),
     SYSTEM_ERROR("S0001", "系统繁忙，请稍后重试");
 
     private final String code;
@@ -25,4 +31,3 @@ public enum ErrorCode {
         return defaultMessage;
     }
 }
-

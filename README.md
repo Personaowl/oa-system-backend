@@ -20,7 +20,7 @@ Shared libraries are under `oa-common`. Business modules may depend on common mo
 - JDK 21
 - Maven 3.9+
 - MySQL 8
-- Nacos 3.2.2 (`127.0.0.1:8848`)
+- Nacos 3.2.2 (`127.0.0.1:8848`，gRPC `9848/9849`)
 - Redis 8 (`127.0.0.1:6379`)
 - Elasticsearch 8.18.1 (`127.0.0.1:9200`)
 - Ollama (`127.0.0.1:12434`) for the AI service
@@ -58,4 +58,14 @@ All Nacos imports are optional so a module can still be compiled and unit-tested
 
 The login → JWT → Gateway authentication → current-user flow is implemented. Run `sql/02-seed-local-admin.sql`, then see [docs/auth-api.md](docs/auth-api.md) for the local test account and requests.
 
+## Attendance service checkpoint
+
+The attendance module implements check-in, today status, check-out, paged records, personal monthly statistics, and authorized administrative summaries. Its OpenAPI JSON is available at `/api/v1/attendance/openapi`; the legacy `/api/v1/attendance/status` endpoint is deprecated in favor of `/actuator/health`.
+
+Run the SQL files in numeric order. Re-run `sql/02-seed-local-admin.sql` after pulling attendance changes so the local administrator receives `attendance:record:query` and `attendance:statistics:query`.
+
+See [oa-attendance-service/README.md](oa-attendance-service/README.md) for local configuration, endpoint contracts, rule configuration, tests, and the Gateway end-to-end script.
+
 See [docs/architecture.md](docs/architecture.md) and [docs/contributing.md](docs/contributing.md).
+
+Approval API and database upgrade instructions: [docs/flow-api.md](docs/flow-api.md).

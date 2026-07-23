@@ -14,6 +14,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -49,6 +50,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleConstraint(ConstraintViolationException exception) {
         return ResponseEntity.badRequest().body(ApiResponse.failure(
                 ErrorCode.INVALID_ARGUMENT.code(), exception.getMessage(), traceId()));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        String message = exception.getName() + ": 参数格式不正确";
+        return ResponseEntity.badRequest().body(ApiResponse.failure(
+                ErrorCode.INVALID_ARGUMENT.code(), message, traceId()));
     }
 
     @ExceptionHandler(Exception.class)
