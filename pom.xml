@@ -26,6 +26,7 @@
         <module>oa-flow-service</module>
         <module>oa-notice-service</module>
         <module>oa-ai-service</module>
+        <module>oa-document-service</module>
     </modules>
 
     <properties>
@@ -131,4 +132,3 @@
         </plugins>
     </build>
 </project>
-
