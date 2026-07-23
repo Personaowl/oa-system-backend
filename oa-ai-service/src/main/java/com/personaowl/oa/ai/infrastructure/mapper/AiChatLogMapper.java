@@ -12,5 +12,7 @@ public interface AiChatLogMapper {
 
     AiChatLog selectById(Long id);
 
+    List<AiChatLog> selectBySessionId(Long sessionId);
+
     List<AiChatLog> selectPage(Long userId, Long queryUserId, String keyword, String knowledgeDomain, Integer hitFlag, Integer offset, Integer size);
 }

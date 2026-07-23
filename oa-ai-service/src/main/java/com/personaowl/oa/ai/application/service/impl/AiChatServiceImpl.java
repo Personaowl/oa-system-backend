@@ -75,15 +75,19 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public PageResultVO<AiChatSessionVO> pageSessions(Long userId, Integer page, Integer size, String keyword, String status) {
-        List<AiChatSession> sessions = aiChatSessionMapper.selectPage(userId, keyword, status, offset(page, size), size == null ? 20 : size);
+        Long uid = requireUserId(userId);
+        List<AiChatSession> sessions = aiChatSessionMapper.selectPage(uid, keyword, status, offset(page, size), size == null ? 20 : size);
         List<AiChatSessionVO> vos = sessions.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, page, size, (long) vos.size());
+        return new PageResultVO<>(vos, page, size, vos.size());
     }
 
     @Override
     public AiChatSessionVO getSession(Long userId, Long sessionId) {
         AiChatSession session = aiChatSessionMapper.selectById(sessionId);
-        return session == null ? AiChatSessionVO.empty(sessionId) : toVO(session);
+        if (session == null) {
+            return AiChatSessionVO.empty(sessionId);
+        }
+        return toVO(session, aiChatLogMapper.selectBySessionId(sessionId));
     }
 
     @Override
@@ -112,7 +116,7 @@ public class AiChatServiceImpl implements AiChatService {
     public PageResultVO<AiChatLogVO> pageLogs(Long userId, Integer page, Integer size, Long queryUserId, String keyword, String knowledgeDomain, Boolean hitFlag) {
         List<AiChatLog> logs = aiChatLogMapper.selectPage(userId, queryUserId, keyword, knowledgeDomain, hitFlag == null ? null : (hitFlag ? 1 : 0), offset(page, size), size == null ? 20 : size);
         List<AiChatLogVO> vos = logs.stream().map(this::toVO).toList();
-        return new PageResultVO<>(vos, page, size, (long) vos.size());
+        return new PageResultVO<>(vos, page, size, vos.size());
     }
 
     @Override
@@ -144,9 +148,18 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private AiChatSessionVO toVO(AiChatSession session) {
+        return toVO(session, List.of());
+    }
+
+    private AiChatSessionVO toVO(AiChatSession session, List<AiChatLog> logs) {
+        List<AiChatSessionVO.AiChatMessageVO> messages = logs.stream()
+                .flatMap(log -> java.util.stream.Stream.of(
+                        new AiChatSessionVO.AiChatMessageVO("user", log.getQuestion(), List.of(), toOffsetDateTime(log.getCreatedAt())),
+                        new AiChatSessionVO.AiChatMessageVO("assistant", log.getAnswer(), List.of(), toOffsetDateTime(log.getCreatedAt()))))
+                .toList();
         return new AiChatSessionVO(session.getId(), session.getSessionNo(), session.getSessionTitle(), session.getKnowledgeDomain(),
                 session.getLatestQuestion(), session.getLatestAnswer(), session.getMessageCount(), session.getStatus(),
-                session.getCreatedAt() == null ? null : session.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(8)), List.of());
+                toOffsetDateTime(session.getCreatedAt()), messages);
     }
 
     private AiChatLogVO toVO(AiChatLog log) {
@@ -154,6 +167,10 @@ public class AiChatServiceImpl implements AiChatService {
                 List.of(), log.getModelName(), log.getTopK(),
                 log.getConfidenceScore() == null ? null : log.getConfidenceScore().doubleValue(), log.getHitFlag() != null && log.getHitFlag() == 1,
                 log.getLatencyMs(), log.getCreatedAt() == null ? null : log.getCreatedAt().atOffset(java.time.ZoneOffset.ofHours(8)));
+    }
+
+    private java.time.OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.atOffset(java.time.ZoneOffset.ofHours(8));
     }
 
     private int offset(Integer page, Integer size) {
