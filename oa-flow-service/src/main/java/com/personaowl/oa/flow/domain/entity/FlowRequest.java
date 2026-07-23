@@ -15,6 +15,9 @@ public class FlowRequest {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String reason;
+    private String leaveType;
+    private String overtimeCompensation;
+    private Integer durationMinutes;
     private String status;
     private Long currentApproverId;
     private LocalDateTime createdAt;
@@ -32,6 +35,12 @@ public class FlowRequest {
     public void setEndTime(LocalDateTime endTime) { this.endTime = endTime; }
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+    public String getLeaveType() { return leaveType; }
+    public void setLeaveType(String leaveType) { this.leaveType = leaveType; }
+    public String getOvertimeCompensation() { return overtimeCompensation; }
+    public void setOvertimeCompensation(String overtimeCompensation) { this.overtimeCompensation = overtimeCompensation; }
+    public Integer getDurationMinutes() { return durationMinutes; }
+    public void setDurationMinutes(Integer durationMinutes) { this.durationMinutes = durationMinutes; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public Long getCurrentApproverId() { return currentApproverId; }

@@ -93,6 +93,22 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
             <script>
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            FROM sys_user
+            WHERE deleted = 0
+            <if test='keyword != null and keyword != ""'>
+              AND (username LIKE CONCAT('%', #{keyword}, '%')
+                   OR display_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test='departmentId != null'>AND department_id = #{departmentId}</if>
+            ORDER BY id DESC
+            </script>
+            """)
+    List<SysUser> findAllAvailable(@Param("keyword") String keyword,
+                                   @Param("departmentId") Long departmentId);
+
+    @Select("""
+            <script>
             SELECT COUNT(*) FROM sys_user
             WHERE deleted = 0
             <if test='keyword != null and keyword != ""'>

@@ -13,17 +13,25 @@ import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
 import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
 import com.personaowl.oa.flow.domain.vo.FlowSearchPageResponse;
+import com.personaowl.oa.flow.domain.vo.FlowActionResponse;
+import com.personaowl.oa.flow.domain.vo.FlowRequestDetailResponse;
 import com.personaowl.oa.flow.search.FlowSearchService;
 import com.personaowl.oa.flow.mapper.FlowActionLogMapper;
+import com.personaowl.oa.flow.mapper.FlowAttendanceMapper;
 import com.personaowl.oa.flow.mapper.FlowRequestMapper;
 import com.personaowl.oa.flow.mapper.FlowUserDirectoryMapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class FlowApprovalService {
@@ -31,12 +39,15 @@ public class FlowApprovalService {
     private final FlowActionLogMapper actionLogMapper;
     private final FlowUserDirectoryMapper userDirectoryMapper;
     private final FlowSearchService flowSearchService;
+    private final FlowAttendanceMapper attendanceMapper;
+    private static final Set<String> LEAVE_TYPES = Set.of("PERSONAL", "SICK", "ANNUAL", "COMPENSATORY");
+    private static final Set<String> OVERTIME_COMPENSATIONS = Set.of("PAY", "COMPENSATORY");
 
     public FlowApprovalService(
             FlowRequestMapper requestMapper,
             FlowActionLogMapper actionLogMapper,
             FlowUserDirectoryMapper userDirectoryMapper) {
-        this(requestMapper, actionLogMapper, userDirectoryMapper, null);
+        this(requestMapper, actionLogMapper, userDirectoryMapper, null, null);
     }
 
     @Autowired
@@ -44,11 +55,13 @@ public class FlowApprovalService {
             FlowRequestMapper requestMapper,
             FlowActionLogMapper actionLogMapper,
             FlowUserDirectoryMapper userDirectoryMapper,
-            FlowSearchService flowSearchService) {
+            FlowSearchService flowSearchService,
+            FlowAttendanceMapper attendanceMapper) {
         this.requestMapper = requestMapper;
         this.actionLogMapper = actionLogMapper;
         this.userDirectoryMapper = userDirectoryMapper;
         this.flowSearchService = flowSearchService;
+        this.attendanceMapper = attendanceMapper;
     }
 
     @Transactional
@@ -57,9 +70,16 @@ public class FlowApprovalService {
         if (!request.endTime().isAfter(request.startTime())) {
             throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "结束时间必须晚于开始时间");
         }
-        if (userId.equals(request.approverId())) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "申请人不能作为自己的审批人");
+        if (requestMapper.countOverlapping(userId, request.startTime(), request.endTime()) > 0) {
+            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "该时间段已有待审批或已通过的申请");
         }
+        String leaveType = type == FlowRequestType.LEAVE
+                ? normalizeRequiredOption(request.leaveType(), LEAVE_TYPES, "请假类型")
+                : null;
+        String compensation = type == FlowRequestType.OVERTIME
+                ? normalizeRequiredOption(request.overtimeCompensation(), OVERTIME_COMPENSATIONS, "加班补偿方式")
+                : null;
+        Long approverId = resolveApprover(userId);
 
         LocalDateTime now = LocalDateTime.now();
         FlowRequest entity = new FlowRequest();
@@ -68,20 +88,26 @@ public class FlowApprovalService {
         entity.setStartTime(request.startTime());
         entity.setEndTime(request.endTime());
         entity.setReason(request.reason().trim());
+        entity.setLeaveType(leaveType);
+        entity.setOvertimeCompensation(compensation);
+        entity.setDurationMinutes(Math.toIntExact(ChronoUnit.MINUTES.between(request.startTime(), request.endTime())));
         entity.setStatus(FlowRequestStatus.PENDING.name());
-        entity.setCurrentApproverId(request.approverId());
+        entity.setCurrentApproverId(approverId);
         entity.setCreatedAt(now);
         entity.setUpdatedAt(now);
         if (requestMapper.insert(entity) != 1) {
             throw new IllegalStateException("创建审批申请失败");
         }
+        insertAction(entity.getId(), userId, "SUBMIT", "提交申请", now);
         synchronize(entity, null);
         return toResponse(entity, null);
     }
 
     @Transactional(readOnly = true)
     public List<FlowApproverResponse> listApprovers(Long currentUserId) {
-        return userDirectoryMapper.findAvailableApprovers(requireUserId(currentUserId));
+        Long approverId = resolveApprover(requireUserId(currentUserId));
+        FlowApproverResponse approver = userDirectoryMapper.findApprover(approverId);
+        return approver == null ? List.of() : List.of(approver);
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +126,7 @@ public class FlowApprovalService {
     }
 
     @Transactional(readOnly = true)
-    public FlowRequestResponse detail(Long requestId, Long currentUserId) {
+    public FlowRequestDetailResponse detail(Long requestId, Long currentUserId) {
         Long userId = requireUserId(currentUserId);
         FlowRequest request = requireRequest(requestId);
         boolean related = userId.equals(request.getApplicantId())
@@ -109,7 +135,36 @@ public class FlowApprovalService {
         if (!related) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
-        return toResponse(request, actionLogMapper.findLatest(requestId));
+        List<FlowActionResponse> timeline = actionLogMapper.findTimeline(requestId).stream()
+                .map(action -> new FlowActionResponse(
+                        action.getId(), action.getAction(), action.getOperatorId(),
+                        findDisplayName(action.getOperatorId()), action.getComment(), action.getOperatedAt()))
+                .toList();
+        return new FlowRequestDetailResponse(
+                toResponse(request, actionLogMapper.findLatest(requestId)), timeline);
+    }
+
+    @Transactional
+    public FlowRequestResponse withdraw(Long requestId, Long applicantId) {
+        Long userId = requireUserId(applicantId);
+        FlowRequest request = requireRequest(requestId);
+        if (!userId.equals(request.getApplicantId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只能撤回本人提交的申请");
+        }
+        if (!FlowRequestStatus.PENDING.name().equals(request.getStatus())) {
+            throw new BusinessException(ErrorCode.APPROVAL_STATE_INVALID, "只有待审批申请可以撤回");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (requestMapper.withdraw(requestId, userId, now) != 1) {
+            throw new BusinessException(ErrorCode.APPROVAL_STATE_INVALID, "申请状态已变化，请刷新后重试");
+        }
+        insertAction(requestId, userId, "WITHDRAW", "申请人主动撤回", now);
+        request.setStatus(FlowRequestStatus.WITHDRAWN.name());
+        request.setCurrentApproverId(null);
+        request.setUpdatedAt(now);
+        FlowActionLog action = actionLogMapper.findLatest(requestId);
+        synchronize(request, action);
+        return toResponse(request, action);
     }
 
     @Transactional
@@ -127,6 +182,10 @@ public class FlowApprovalService {
         }
 
         FlowDecision decision = parseDecision(approval.decision());
+        if (decision == FlowDecision.REJECT
+                && (approval.comment() == null || approval.comment().isBlank())) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "驳回申请时必须填写审批意见");
+        }
         String newStatus = decision == FlowDecision.APPROVE
                 ? FlowRequestStatus.APPROVED.name()
                 : FlowRequestStatus.REJECTED.name();
@@ -136,19 +195,15 @@ public class FlowApprovalService {
             throw new BusinessException(ErrorCode.APPROVAL_STATE_INVALID, "申请已被处理，请刷新后重试");
         }
 
-        FlowActionLog action = new FlowActionLog();
-        action.setRequestId(requestId);
-        action.setOperatorId(userId);
-        action.setAction(decision.name());
-        action.setComment(normalizeComment(approval.comment()));
-        action.setOperatedAt(now);
-        if (actionLogMapper.insert(action) != 1) {
-            throw new IllegalStateException("保存审批记录失败");
-        }
+        FlowActionLog action = insertAction(
+                requestId, userId, decision.name(), normalizeComment(approval.comment()), now);
 
         request.setStatus(newStatus);
         request.setCurrentApproverId(null);
         request.setUpdatedAt(now);
+        if (decision == FlowDecision.APPROVE && FlowRequestType.LEAVE.name().equals(request.getRequestType())) {
+            synchronizeApprovedLeave(request, now);
+        }
         synchronize(request, action);
         return toResponse(request, action);
     }
@@ -220,5 +275,57 @@ public class FlowApprovalService {
 
     private String normalizeComment(String comment) {
         return comment == null || comment.isBlank() ? null : comment.trim();
+    }
+
+    private Long resolveApprover(Long applicantId) {
+        Long approverId = userDirectoryMapper.findDepartmentManager(applicantId);
+        if (!isValidUserId(approverId)) approverId = userDirectoryMapper.findFallbackAdmin(applicantId);
+        if (!isValidUserId(approverId)) approverId = userDirectoryMapper.findFallbackManager(applicantId);
+        if (!isValidUserId(approverId)) {
+            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "未找到可用审批人，请先配置部门负责人");
+        }
+        return approverId;
+    }
+
+    private boolean isValidUserId(Long userId) {
+        return userId != null && userId > 0;
+    }
+
+    private String normalizeRequiredOption(String value, Set<String> allowed, String label) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, label + "不能为空");
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!allowed.contains(normalized)) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, label + "不合法");
+        }
+        return normalized;
+    }
+
+    private FlowActionLog insertAction(
+            Long requestId, Long operatorId, String actionName, String comment, LocalDateTime operatedAt) {
+        FlowActionLog action = new FlowActionLog();
+        action.setRequestId(requestId);
+        action.setOperatorId(operatorId);
+        action.setAction(actionName);
+        action.setComment(comment);
+        action.setOperatedAt(operatedAt);
+        if (actionLogMapper.insert(action) != 1) {
+            throw new IllegalStateException("保存审批记录失败");
+        }
+        return action;
+    }
+
+    private void synchronizeApprovedLeave(FlowRequest request, LocalDateTime approvedAt) {
+        if (attendanceMapper == null) return;
+        LocalDate date = request.getStartTime().toLocalDate();
+        LocalDate endDate = request.getEndTime().toLocalDate();
+        while (!date.isAfter(endDate)) {
+            if (date.getDayOfWeek() != DayOfWeek.SATURDAY && date.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                attendanceMapper.insertApprovedLeave(
+                        IdWorker.getId(), request.getApplicantId(), date, approvedAt);
+            }
+            date = date.plusDays(1);
+        }
     }
 }

@@ -57,9 +57,23 @@ public class UserManagementService {
         return listUsersInternal(keyword, scopedDepartmentId == null ? departmentId : scopedDepartmentId, page, size);
     }
 
+    @Transactional(readOnly = true)
+    public List<UserResponse> listUsersForExport(Long operatorId, String roles, String keyword,
+                                                 Long departmentId) {
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        if (scopedDepartmentId != null && departmentId != null && !scopedDepartmentId.equals(departmentId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能导出本部门员工");
+        }
+        Long effectiveDepartmentId = scopedDepartmentId == null ? departmentId : scopedDepartmentId;
+        if (effectiveDepartmentId != null) requireDepartment(effectiveDepartmentId);
+        return userMapper.findAllAvailable(normalizeKeyword(keyword), effectiveDepartmentId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private UserPageResponse listUsersInternal(String keyword, Long departmentId, Integer page, Integer size) {
-        String normalizedKeyword = keyword == null ? null : keyword.trim();
-        if (normalizedKeyword != null && normalizedKeyword.isEmpty()) normalizedKeyword = null;
+        String normalizedKeyword = normalizeKeyword(keyword);
         if (departmentId != null) requireDepartment(departmentId);
         int normalizedPage = Math.max(1, page == null ? 1 : page);
         int normalizedSize = Math.min(100, Math.max(1, size == null ? 20 : size));
@@ -70,6 +84,12 @@ public class UserManagementService {
                         normalizedKeyword, departmentId, offset, normalizedSize)
                 .stream().map(this::toResponse).toList();
         return new UserPageResponse(total, records);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) return null;
+        String normalized = keyword.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     @Transactional

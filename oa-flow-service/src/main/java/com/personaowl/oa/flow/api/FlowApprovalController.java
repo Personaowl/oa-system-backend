@@ -10,6 +10,7 @@ import com.personaowl.oa.flow.domain.dto.FlowSearchRequest;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.domain.vo.FlowRequestResponse;
 import com.personaowl.oa.flow.domain.vo.FlowApproverResponse;
+import com.personaowl.oa.flow.domain.vo.FlowRequestDetailResponse;
 import com.personaowl.oa.flow.domain.vo.FlowSearchPageResponse;
 import com.personaowl.oa.flow.domain.vo.FlowSearchReindexResponse;
 import com.personaowl.oa.flow.search.FlowSearchService;
@@ -71,11 +72,19 @@ public class FlowApprovalController {
     }
 
     @GetMapping("/requests/{id}")
-    public ApiResponse<FlowRequestResponse> detail(
+    public ApiResponse<FlowRequestDetailResponse> detail(
             @PathVariable Long id,
             @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         return ApiResponse.success(flowApprovalService.detail(id, userId), traceId);
+    }
+
+    @PostMapping("/requests/{id}/withdraw")
+    public ApiResponse<FlowRequestResponse> withdraw(
+            @PathVariable Long id,
+            @RequestHeader(value = RequestHeaders.USER_ID, required = false) Long userId,
+            @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
+        return ApiResponse.success(flowApprovalService.withdraw(id, userId), traceId);
     }
 
     @GetMapping("/search")

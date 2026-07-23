@@ -7,13 +7,19 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class AiRagServiceImpl implements AiRagService {
+
+    private static final Logger log = LoggerFactory.getLogger(AiRagServiceImpl.class);
+    private static final String FALLBACK_ANSWER = "暂时无法生成回答。涉及公司具体制度时，建议以最新制度文件或管理员说明为准。";
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
@@ -28,7 +34,9 @@ public class AiRagServiceImpl implements AiRagService {
     @Override
     public RagResult answer(String question, String knowledgeDomain, Integer topK) {
         int k = topK == null ? Math.max(1, properties.topK()) : topK;
-        List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder().query(question).topK(k).build());
+        List<Document> documents = Optional.ofNullable(
+                        vectorStore.similaritySearch(SearchRequest.builder().query(question).topK(k).build()))
+                .orElseGet(List::of);
         boolean hit = !documents.isEmpty();
 
         String context = documents.stream()
@@ -41,12 +49,7 @@ public class AiRagServiceImpl implements AiRagService {
         String user = "问题：" + question + "\n\n" +
                 (hit ? "可参考的知识库上下文：\n" + context : "知识库中未检索到直接相关内容。请基于通用办公知识回答，并说明具体公司规定应以最新制度为准。");
 
-        String answer = chatClient.prompt(new Prompt(new SystemMessage(system), new UserMessage(user)))
-                .call()
-                .content();
-        if (answer == null || answer.isBlank()) {
-            answer = "暂时无法生成回答。涉及公司具体制度时，建议以最新制度文件或管理员说明为准。";
-        }
+        String answer = generateAnswer(system, user);
 
         List<Citation> citations = documents.stream()
                 .map(doc -> new Citation(
@@ -62,6 +65,18 @@ public class AiRagServiceImpl implements AiRagService {
                 .toList();
 
         return new RagResult(answer, hit, citations, matchedDocs, hit ? 0.85d : 0.0d);
+    }
+
+    private String generateAnswer(String system, String user) {
+        try {
+            String answer = chatClient.prompt(new Prompt(new SystemMessage(system), new UserMessage(user)))
+                    .call()
+                    .content();
+            return answer == null || answer.isBlank() ? FALLBACK_ANSWER : answer;
+        } catch (RuntimeException ex) {
+            log.warn("AI model invocation failed, returning fallback answer: {}", ex.getMessage());
+            return FALLBACK_ANSWER;
+        }
     }
 
     private Long toLong(Object value) {

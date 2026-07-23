@@ -8,7 +8,7 @@
             resultType="com.personaowl.oa.attendance.infrastructure.persistence.AttendanceStatisticsAggregate">
         SELECT COUNT(*) AS totalRecords,
                COUNT(DISTINCT user_id) AS totalUsers,
-               COALESCE(SUM(CASE WHEN status = 'NORMAL' THEN 1 ELSE 0 END), 0) AS normalCount,
+               COALESCE(SUM(CASE WHEN status IN ('NORMAL', 'LEAVE') THEN 1 ELSE 0 END), 0) AS normalCount,
                COALESCE(SUM(CASE
                    WHEN late_minutes > 0
                        OR status IN ('IN_PROGRESS_LATE', 'LATE', 'LATE_AND_EARLY_LEAVE')

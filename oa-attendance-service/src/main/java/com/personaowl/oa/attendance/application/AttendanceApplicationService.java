@@ -409,7 +409,8 @@ public class AttendanceApplicationService {
                     false);
         }
 
-        boolean canCheckIn = record.getCheckInTime() == null;
+        boolean canCheckIn = record.getCheckInTime() == null
+                && record.getStatus() != AttendanceStatus.LEAVE;
         boolean canCheckOut = record.getCheckInTime() != null
                 && record.getCheckOutTime() == null
                 && (record.getStatus() == AttendanceStatus.IN_PROGRESS

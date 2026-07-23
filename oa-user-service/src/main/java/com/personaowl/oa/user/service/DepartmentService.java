@@ -53,6 +53,17 @@ public class DepartmentService {
     }
 
     /**
+     * 导出时直接读取数据库快照，避免把历史缓存内容写入文件。
+     */
+    @Transactional(readOnly = true)
+    public List<DepartmentResponse> listDepartmentsForExport() {
+        return departmentMapper.findAllAvailable()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
      * 根据部门 ID 查询部门详情。
      *
      * @param id 部门 ID

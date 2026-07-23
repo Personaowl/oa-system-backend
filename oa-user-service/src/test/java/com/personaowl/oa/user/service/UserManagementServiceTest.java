@@ -101,6 +101,21 @@ class UserManagementServiceTest {
     }
 
     @Test
+    void managerExportIsAutomaticallyScopedToOwnDepartment() {
+        SysUser manager = user(10L, "manager");
+        SysDepartment department = department();
+        department.setManagerId(10L);
+        when(userMapper.findAvailableById(10L)).thenReturn(manager);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+        when(userMapper.findAllAvailable(null, 1L)).thenReturn(List.of());
+
+        var response = service.listUsersForExport(10L, "MANAGER", null, null);
+
+        assertThat(response).isEmpty();
+        verify(userMapper).findAllAvailable(null, 1L);
+    }
+
+    @Test
     void managerCannotAdjustSalaryOutsideOwnDepartment() {
         SysUser manager = user(10L, "manager");
         SysUser target = user(20L, "outside");

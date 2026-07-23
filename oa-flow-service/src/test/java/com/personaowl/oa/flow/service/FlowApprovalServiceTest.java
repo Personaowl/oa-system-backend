@@ -9,6 +9,7 @@ import com.personaowl.oa.flow.domain.entity.FlowRequest;
 import com.personaowl.oa.flow.domain.enums.FlowRequestStatus;
 import com.personaowl.oa.flow.domain.enums.FlowRequestType;
 import com.personaowl.oa.flow.mapper.FlowActionLogMapper;
+import com.personaowl.oa.flow.mapper.FlowAttendanceMapper;
 import com.personaowl.oa.flow.mapper.FlowRequestMapper;
 import com.personaowl.oa.flow.mapper.FlowUserDirectoryMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,12 +19,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,40 +39,70 @@ class FlowApprovalServiceTest {
     private FlowActionLogMapper actionLogMapper;
     @Mock
     private FlowUserDirectoryMapper userDirectoryMapper;
+    @Mock
+    private FlowAttendanceMapper attendanceMapper;
 
     private FlowApprovalService service;
     private LocalDateTime startTime;
 
     @BeforeEach
     void setUp() {
-        service = new FlowApprovalService(requestMapper, actionLogMapper, userDirectoryMapper);
+        service = new FlowApprovalService(
+                requestMapper, actionLogMapper, userDirectoryMapper, null, attendanceMapper);
         startTime = LocalDateTime.of(2026, 7, 23, 9, 0);
     }
 
     @Test
-    void submitLeaveCreatesPendingRequest() {
+    void submitLeaveCreatesPendingRequestAndUsesDepartmentManager() {
+        when(userDirectoryMapper.findDepartmentManager(1L)).thenReturn(2L);
         when(requestMapper.insert(any(FlowRequest.class))).thenAnswer(invocation -> {
             FlowRequest request = invocation.getArgument(0);
             request.setId(10L);
             return 1;
         });
+        when(actionLogMapper.insert(any(FlowActionLog.class))).thenReturn(1);
 
         var response = service.submit(
                 FlowRequestType.LEAVE,
-                new FlowSubmitRequest(startTime, startTime.plusHours(8), " 年假 ", 2L),
+                new FlowSubmitRequest(
+                        startTime, startTime.plusHours(8), " 年假 ", "ANNUAL", null),
                 1L);
 
         assertEquals(10L, response.id());
         assertEquals("LEAVE", response.requestType());
         assertEquals("PENDING", response.status());
         assertEquals("年假", response.reason());
+        assertEquals("ANNUAL", response.leaveType());
+        assertEquals(480, response.durationMinutes());
         assertEquals(2L, response.currentApproverId());
+        verify(actionLogMapper).insert(any(FlowActionLog.class));
+    }
+
+    @Test
+    void submitOvertimeUsesFallbackAdminAndCompensationOption() {
+        when(userDirectoryMapper.findFallbackAdmin(1L)).thenReturn(3L);
+        when(requestMapper.insert(any(FlowRequest.class))).thenAnswer(invocation -> {
+            FlowRequest request = invocation.getArgument(0);
+            request.setId(11L);
+            return 1;
+        });
+        when(actionLogMapper.insert(any(FlowActionLog.class))).thenReturn(1);
+
+        var response = service.submit(
+                FlowRequestType.OVERTIME,
+                new FlowSubmitRequest(
+                        startTime, startTime.plusHours(2), "发布支持", null, "COMPENSATORY"),
+                1L);
+
+        assertEquals("OVERTIME", response.requestType());
+        assertEquals("COMPENSATORY", response.overtimeCompensation());
+        assertEquals(3L, response.currentApproverId());
     }
 
     @Test
     void submitRejectsInvalidTimeRange() {
         FlowSubmitRequest request = new FlowSubmitRequest(
-                startTime, startTime.minusMinutes(1), "请假", 2L);
+                startTime, startTime.minusMinutes(1), "请假", "PERSONAL", null);
 
         BusinessException exception = assertThrows(
                 BusinessException.class,
@@ -77,16 +112,32 @@ class FlowApprovalServiceTest {
     }
 
     @Test
-    void submitRejectsSelfApproval() {
+    void submitRejectsOverlappingApplication() {
+        when(requestMapper.countOverlapping(1L, startTime, startTime.plusHours(1))).thenReturn(1L);
         FlowSubmitRequest request = new FlowSubmitRequest(
-                startTime, startTime.plusHours(1), "加班", 1L);
+                startTime, startTime.plusHours(1), "请假", "PERSONAL", null);
 
-        assertThrows(BusinessException.class,
-                () -> service.submit(FlowRequestType.OVERTIME, request, 1L));
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submit(FlowRequestType.LEAVE, request, 1L));
+
+        assertEquals("该时间段已有待审批或已通过的申请", exception.getMessage());
     }
 
     @Test
-    void approveCompletesPendingRequestAndWritesLog() {
+    void submitRejectsWhenNoApproverCanBeResolved() {
+        FlowSubmitRequest request = new FlowSubmitRequest(
+                startTime, startTime.plusHours(1), "加班", null, "PAY");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.submit(FlowRequestType.OVERTIME, request, 1L));
+
+        assertEquals("未找到可用审批人，请先配置部门负责人", exception.getMessage());
+    }
+
+    @Test
+    void approveCompletesPendingLeaveWritesLogAndSynchronizesAttendance() {
         FlowRequest pending = pendingRequest();
         when(requestMapper.selectById(10L)).thenReturn(pending);
         when(requestMapper.completeApproval(eq(10L), eq(2L), eq("APPROVED"), any()))
@@ -101,6 +152,7 @@ class FlowApprovalServiceTest {
         assertEquals("同意", response.approvalComment());
         assertEquals(2L, response.decidedBy());
         assertNull(response.currentApproverId());
+        verify(attendanceMapper).insertApprovedLeave(any(Long.class), eq(1L), any(), any());
     }
 
     @Test
@@ -116,6 +168,43 @@ class FlowApprovalServiceTest {
 
         assertEquals("REJECTED", response.status());
         assertEquals("REJECT", response.decision());
+    }
+
+    @Test
+    void rejectRequiresComment() {
+        when(requestMapper.selectById(10L)).thenReturn(pendingRequest());
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> service.approve(
+                        10L, new FlowApprovalRequest("REJECT", "  "), 2L));
+
+        assertEquals("驳回申请时必须填写审批意见", exception.getMessage());
+        verify(requestMapper, never()).completeApproval(any(), any(), any(), any());
+    }
+
+    @Test
+    void applicantCanWithdrawPendingRequest() {
+        when(requestMapper.selectById(10L)).thenReturn(pendingRequest());
+        when(requestMapper.withdraw(eq(10L), eq(1L), any())).thenReturn(1);
+        when(actionLogMapper.insert(any(FlowActionLog.class))).thenReturn(1);
+
+        var response = service.withdraw(10L, 1L);
+
+        assertEquals("WITHDRAWN", response.status());
+        assertNull(response.currentApproverId());
+        verify(requestMapper).withdraw(eq(10L), eq(1L), any());
+    }
+
+    @Test
+    void detailReturnsCompleteTimeline() {
+        when(requestMapper.selectById(10L)).thenReturn(pendingRequest());
+        when(actionLogMapper.findTimeline(10L)).thenReturn(List.of());
+
+        var response = service.detail(10L, 1L);
+
+        assertEquals(10L, response.request().id());
+        assertTrue(response.timeline().isEmpty());
     }
 
     @Test
@@ -153,6 +242,8 @@ class FlowApprovalServiceTest {
         request.setStartTime(startTime);
         request.setEndTime(startTime.plusHours(8));
         request.setReason("年假");
+        request.setLeaveType("ANNUAL");
+        request.setDurationMinutes(480);
         request.setStatus(FlowRequestStatus.PENDING.name());
         request.setCurrentApproverId(2L);
         request.setCreatedAt(startTime.minusDays(1));

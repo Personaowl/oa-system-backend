@@ -18,10 +18,15 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:root}
     password: ${SPRING_DATASOURCE_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      schema-locations: classpath:schema-ai.sql
   ai:
     openai:
       base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
-      api-key: ${SILICONFLOW_API_KEY:sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq}
+      api-key: ${SILICONFLOW_API_KEY:}
       chat.options.model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
       embedding.options.model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
     vectorstore:
@@ -46,6 +51,6 @@ ai:
     chat-model: ${SILICONFLOW_CHAT_MODEL:Pro/deepseek-ai/DeepSeek-V3.2}
     embedding-model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
     base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
-    api-key: ${SILICONFLOW_API_KEY:sk-zoudwrpmkpvuitjigsczqxcfjtlztkmqjiexwiyvapuzdcpq}
+    api-key: ${SILICONFLOW_API_KEY:}
     redis-host: ${REDIS_HOST:127.0.0.1}
     redis-port: ${REDIS_PORT:6379}

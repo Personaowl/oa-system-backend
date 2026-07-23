@@ -11,6 +11,7 @@ public record FlowSubmitRequest(
         @NotNull(message = "结束时间不能为空") LocalDateTime endTime,
         @NotBlank(message = "申请原因不能为空")
         @Size(max = 500, message = "申请原因不能超过500个字符") String reason,
-        @NotNull(message = "审批人不能为空") Long approverId
+        @Size(max = 32, message = "请假类型不能超过32个字符") String leaveType,
+        @Size(max = 32, message = "加班补偿方式不能超过32个字符") String overtimeCompensation
 ) {
 }

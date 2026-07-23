@@ -96,18 +96,22 @@ CREATE TABLE IF NOT EXISTS flow_request (
     start_time DATETIME NOT NULL COMMENT '开始时间',
     end_time DATETIME NOT NULL COMMENT '结束时间',
     reason VARCHAR(500) NOT NULL COMMENT '申请原因',
+    leave_type VARCHAR(32) NULL COMMENT '请假类型：PERSONAL/SICK/ANNUAL/COMPENSATORY',
+    overtime_compensation VARCHAR(32) NULL COMMENT '加班补偿：PAY/COMPENSATORY',
+    duration_minutes INT NOT NULL DEFAULT 0 COMMENT '申请时长（分钟）',
     status VARCHAR(32) NOT NULL COMMENT '流程状态',
     current_approver_id BIGINT NULL COMMENT '当前审批人ID',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    KEY idx_flow_applicant_status (applicant_id, status)
+    KEY idx_flow_applicant_status (applicant_id, status),
+    KEY idx_flow_applicant_time (applicant_id, start_time, end_time)
 ) COMMENT='请假与加班申请';
 
 CREATE TABLE IF NOT EXISTS flow_action_log (
     id BIGINT PRIMARY KEY COMMENT '审批操作日志主键',
     request_id BIGINT NOT NULL COMMENT '流程申请ID',
     operator_id BIGINT NOT NULL COMMENT '审批人ID',
-    action VARCHAR(32) NOT NULL COMMENT '审批动作：APPROVE/REJECT',
+    action VARCHAR(32) NOT NULL COMMENT '流程动作：SUBMIT/APPROVE/REJECT/WITHDRAW',
     comment VARCHAR(500) NULL COMMENT '审批意见',
     operated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
     KEY idx_flow_action_request (request_id, operated_at),

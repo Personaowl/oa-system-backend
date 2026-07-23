@@ -6,14 +6,24 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface FlowActionLogMapper extends BaseMapper<FlowActionLog> {
     @Select("""
             SELECT * FROM flow_action_log
             WHERE request_id = #{requestId}
+              AND action IN ('APPROVE', 'REJECT', 'WITHDRAW')
             ORDER BY operated_at DESC, id DESC LIMIT 1
             """)
     FlowActionLog findLatest(@Param("requestId") Long requestId);
+
+    @Select("""
+            SELECT * FROM flow_action_log
+            WHERE request_id = #{requestId}
+            ORDER BY operated_at ASC, id ASC
+            """)
+    List<FlowActionLog> findTimeline(@Param("requestId") Long requestId);
 
     @Select("""
             SELECT COUNT(1) FROM flow_action_log

@@ -33,9 +33,21 @@ public interface FlowRequestMapper extends BaseMapper<FlowRequest> {
             SELECT r.* FROM flow_request r
             JOIN flow_action_log l ON l.request_id = r.id
             WHERE l.operator_id = #{approverId}
+              AND l.action IN ('APPROVE', 'REJECT')
             ORDER BY l.operated_at DESC, l.id DESC
             """)
     List<FlowRequest> findDone(@Param("approverId") Long approverId);
+
+    @Select("""
+            SELECT COUNT(1) FROM flow_request
+            WHERE applicant_id = #{applicantId}
+              AND status IN ('PENDING', 'APPROVED')
+              AND start_time < #{endTime}
+              AND end_time > #{startTime}
+            """)
+    long countOverlapping(@Param("applicantId") Long applicantId,
+                          @Param("startTime") LocalDateTime startTime,
+                          @Param("endTime") LocalDateTime endTime);
 
     @Update("""
             UPDATE flow_request
@@ -47,4 +59,13 @@ public interface FlowRequestMapper extends BaseMapper<FlowRequest> {
                          @Param("approverId") Long approverId,
                          @Param("newStatus") String newStatus,
                          @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Update("""
+            UPDATE flow_request
+            SET status = 'WITHDRAWN', current_approver_id = NULL, updated_at = #{updatedAt}
+            WHERE id = #{requestId} AND applicant_id = #{applicantId} AND status = 'PENDING'
+            """)
+    int withdraw(@Param("requestId") Long requestId,
+                 @Param("applicantId") Long applicantId,
+                 @Param("updatedAt") LocalDateTime updatedAt);
 }

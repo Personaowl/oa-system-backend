@@ -13,6 +13,9 @@ public record FlowRequestResponse(
         LocalDateTime startTime,
         LocalDateTime endTime,
         String reason,
+        String leaveType,
+        String overtimeCompensation,
+        Integer durationMinutes,
         String status,
         Long currentApproverId,
         String currentApproverName,
@@ -33,6 +36,7 @@ public record FlowRequestResponse(
         return new FlowRequestResponse(
                 request.getId(), request.getApplicantId(), applicantName, request.getRequestType(),
                 request.getStartTime(), request.getEndTime(), request.getReason(),
+                request.getLeaveType(), request.getOvertimeCompensation(), request.getDurationMinutes(),
                 request.getStatus(), request.getCurrentApproverId(), currentApproverName,
                 action == null ? null : action.getAction(),
                 action == null ? null : action.getComment(),
