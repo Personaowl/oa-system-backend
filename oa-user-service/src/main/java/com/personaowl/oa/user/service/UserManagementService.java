@@ -8,6 +8,8 @@ import com.personaowl.oa.user.api.dto.UserCreateRequest;
 import com.personaowl.oa.user.api.dto.UserPageResponse;
 import com.personaowl.oa.user.api.dto.UserResponse;
 import com.personaowl.oa.user.api.dto.UserUpdateRequest;
+import com.personaowl.oa.user.api.dto.SalaryDetailUpdateRequest;
+import com.personaowl.oa.user.api.dto.SalaryGradeResponse;
 import com.personaowl.oa.user.domain.SysDepartment;
 import com.personaowl.oa.user.domain.SysUser;
 import com.personaowl.oa.user.mapper.SysDepartmentMapper;
@@ -27,6 +29,16 @@ import java.util.Locale;
 
 @Service
 public class UserManagementService {
+    private static final List<SalaryGradeResponse> SALARY_GRADES = List.of(
+            grade("13A", "4500"), grade("13B", "4800"), grade("13C", "5200"),
+            grade("14A", "5600"), grade("14B", "6000"), grade("14C", "6500"),
+            grade("15A", "7000"), grade("15B", "7500"), grade("15C", "8000"),
+            grade("16A", "8600"), grade("16B", "9200"), grade("16C", "9800"),
+            grade("17A", "10500"), grade("17B", "11200"), grade("17C", "12000"),
+            grade("18A", "13000"), grade("18B", "14000"), grade("18C", "15000"),
+            grade("19A", "16500"), grade("19B", "18000"), grade("19C", "20000"),
+            grade("20A", "22000"), grade("20B", "25000"), grade("20C", "28000")
+    );
     private final SysUserMapper userMapper;
     private final SysDepartmentMapper departmentMapper;
     private final RbacService rbacService;
@@ -110,6 +122,42 @@ public class UserManagementService {
         return toResponse(target);
     }
 
+    @Transactional(readOnly = true)
+    public List<SalaryGradeResponse> listSalaryGrades() {
+        return SALARY_GRADES;
+    }
+
+    @Transactional
+    public UserResponse updateSalaryDetail(Long operatorId, String roles, Long userId,
+                                           SalaryDetailUpdateRequest request) {
+        SysUser target = requireUser(userId);
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        if (scopedDepartmentId != null && !scopedDepartmentId.equals(target.getDepartmentId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能调整本部门员工薪资");
+        }
+
+        String gradeCode = request.salaryGrade().trim().toUpperCase(Locale.ROOT);
+        BigDecimal baseSalary = SALARY_GRADES.stream()
+                .filter(item -> item.code().equals(gradeCode))
+                .map(SalaryGradeResponse::baseSalary)
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_ARGUMENT, "职级必须在13A至20C之间"));
+        BigDecimal performanceSalary = normalizeMoney(request.performanceSalary(), "绩效工资");
+        BigDecimal deductionSalary = normalizeMoney(request.deductionSalary(), "扣除工资");
+        if (deductionSalary.compareTo(baseSalary.add(performanceSalary)) > 0) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "扣除工资不能超过基础薪资与绩效工资之和");
+        }
+        if (userMapper.updateSalaryDetail(userId, gradeCode, baseSalary,
+                performanceSalary, deductionSalary) != 1) {
+            throw new IllegalStateException("更新员工薪资失败");
+        }
+        target.setSalaryGrade(gradeCode);
+        target.setSalary(baseSalary);
+        target.setPerformanceSalary(performanceSalary);
+        target.setDeductionSalary(deductionSalary);
+        return toResponse(target);
+    }
+
     @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = CacheNames.DEPARTMENT_LIST, allEntries = true),
@@ -130,6 +178,10 @@ public class UserManagementService {
         user.setDepartmentId(request.departmentId());
         user.setPhone(normalizeOptional(request.phone()));
         user.setEmail(normalizeOptional(request.email()));
+        user.setSalaryGrade("13A");
+        user.setSalary(new BigDecimal("4500.00"));
+        user.setPerformanceSalary(BigDecimal.ZERO.setScale(2));
+        user.setDeductionSalary(BigDecimal.ZERO.setScale(2));
         user.setStatus(normalizeStatus(request.status()));
         user.setDeleted(0);
         if (userMapper.insert(user) != 1) throw new IllegalStateException("创建员工失败");
@@ -188,7 +240,12 @@ public class UserManagementService {
         Set<String> roleCodes = new LinkedHashSet<>(userMapper.findRoleCodes(user.getId()));
         return new UserResponse(user.getId(), user.getDepartmentId(),
                 department == null ? null : department.getName(), user.getUsername(), user.getDisplayName(),
-                user.getPhone(), user.getEmail(), user.getSalary(), user.getStatus(), roleIds, roleCodes);
+                user.getPhone(), user.getEmail(), moneyOrZero(user.getSalary()),
+                user.getSalaryGrade() == null ? "13A" : user.getSalaryGrade(),
+                moneyOrZero(user.getPerformanceSalary()), moneyOrZero(user.getDeductionSalary()),
+                moneyOrZero(user.getSalary()).add(moneyOrZero(user.getPerformanceSalary()))
+                        .subtract(moneyOrZero(user.getDeductionSalary())),
+                user.getStatus(), roleIds, roleCodes);
     }
 
     private SysUser requireUser(Long id) {
@@ -213,6 +270,23 @@ public class UserManagementService {
 
     private String normalizeOptional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private BigDecimal normalizeMoney(BigDecimal value, String label) {
+        if (value == null || value.signum() < 0 || value.scale() > 2
+                || value.precision() - value.scale() > 10) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT,
+                    label + "必须是0到9999999999.99之间的金额，最多两位小数");
+        }
+        return value.setScale(2);
+    }
+
+    private BigDecimal moneyOrZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO.setScale(2) : value.setScale(2);
+    }
+
+    private static SalaryGradeResponse grade(String code, String baseSalary) {
+        return new SalaryGradeResponse(code, new BigDecimal(baseSalary).setScale(2));
     }
 
     private Integer normalizeStatus(Integer status) {

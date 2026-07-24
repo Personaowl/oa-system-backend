@@ -68,6 +68,13 @@ Run the SQL files in numeric order. Re-run `sql/02-seed-local-admin.sql` after p
 
 See [oa-attendance-service/README.md](oa-attendance-service/README.md) for local configuration, endpoint contracts, rule configuration, tests, and the Gateway end-to-end script.
 
+## Salary management
+
+Run `sql/19-salary-management.sql` to add salary grade, performance salary and deduction salary fields.
+The independent salary APIs are `GET /api/v1/salaries`, `GET /api/v1/salaries/grades` and
+`PUT /api/v1/salaries/{userId}`. Base salary is selected from the fixed 13A-20C grade table;
+performance salary and deductions are maintained directly.
+
 See [docs/architecture.md](docs/architecture.md) and [docs/contributing.md](docs/contributing.md).
 
 Approval API and database upgrade instructions: [docs/flow-api.md](docs/flow-api.md).

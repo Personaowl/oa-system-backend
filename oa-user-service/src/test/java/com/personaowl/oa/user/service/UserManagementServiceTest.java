@@ -4,6 +4,7 @@ import com.personaowl.oa.common.core.error.BusinessException;
 import com.personaowl.oa.common.core.error.ErrorCode;
 import com.personaowl.oa.user.api.dto.UserCreateRequest;
 import com.personaowl.oa.user.api.dto.UserUpdateRequest;
+import com.personaowl.oa.user.api.dto.SalaryDetailUpdateRequest;
 import com.personaowl.oa.user.domain.SysDepartment;
 import com.personaowl.oa.user.domain.SysUser;
 import com.personaowl.oa.user.mapper.SysDepartmentMapper;
@@ -145,6 +146,26 @@ class UserManagementServiceTest {
 
         assertThat(response.salary()).isEqualByComparingTo("13500.00");
         verify(userMapper).updateSalary(20L, new BigDecimal("13500.00"));
+    }
+
+    @Test
+    void adminCanUpdateGradePerformanceAndDeduction() {
+        SysUser target = user(20L, "employee");
+        when(userMapper.findAvailableById(20L)).thenReturn(target);
+        when(userMapper.updateSalaryDetail(20L, "18B", new BigDecimal("14000.00"),
+                new BigDecimal("1800.00"), new BigDecimal("300.00"))).thenReturn(1);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department());
+        when(userMapper.findRoleIds(20L)).thenReturn(List.of(2L));
+        when(userMapper.findRoleCodes(20L)).thenReturn(List.of("EMPLOYEE"));
+
+        var response = service.updateSalaryDetail(1L, "ADMIN", 20L,
+                new SalaryDetailUpdateRequest("18b", new BigDecimal("1800"), new BigDecimal("300")));
+
+        assertThat(response.salaryGrade()).isEqualTo("18B");
+        assertThat(response.salary()).isEqualByComparingTo("14000.00");
+        assertThat(response.performanceSalary()).isEqualByComparingTo("1800.00");
+        assertThat(response.deductionSalary()).isEqualByComparingTo("300.00");
+        assertThat(response.payableSalary()).isEqualByComparingTo("15500.00");
     }
 
     private SysDepartment department() {

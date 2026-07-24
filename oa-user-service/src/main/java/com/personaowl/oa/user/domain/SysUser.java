@@ -29,6 +29,9 @@ public class SysUser {
     private String phone;
     private String email;
     private BigDecimal salary;
+    private String salaryGrade;
+    private BigDecimal performanceSalary;
+    private BigDecimal deductionSalary;
     private Integer status;
     private Integer deleted;
 
@@ -102,6 +105,30 @@ public class SysUser {
 
     public void setSalary(BigDecimal salary) {
         this.salary = salary;
+    }
+
+    public String getSalaryGrade() {
+        return salaryGrade;
+    }
+
+    public void setSalaryGrade(String salaryGrade) {
+        this.salaryGrade = salaryGrade;
+    }
+
+    public BigDecimal getPerformanceSalary() {
+        return performanceSalary;
+    }
+
+    public void setPerformanceSalary(BigDecimal performanceSalary) {
+        this.performanceSalary = performanceSalary;
+    }
+
+    public BigDecimal getDeductionSalary() {
+        return deductionSalary;
+    }
+
+    public void setDeductionSalary(BigDecimal deductionSalary) {
+        this.deductionSalary = deductionSalary;
     }
 
     public Integer getStatus() {

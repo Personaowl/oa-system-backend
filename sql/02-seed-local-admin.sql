@@ -109,8 +109,8 @@ VALUES
     (33, 0, 'sys:user:delete', '删除员工', 'API', '/api/v1/users/{id}', 0),
     (34, 0, 'attendance:rule:update', '修改考勤规则', 'API', '/api/v1/attendance/rules/current', 0),
     (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0),
-    (36, 0, 'sys:salary:view', '查看员工薪资', 'API', '/api/v1/users', 0),
-    (37, 0, 'sys:salary:update', '调整员工薪资', 'API', '/api/v1/users/{id}/salary', 0)
+    (36, 0, 'sys:salary:view', '查看薪资管理', 'API', '/api/v1/salaries', 0),
+    (37, 0, 'sys:salary:update', '维护员工薪资', 'API', '/api/v1/salaries/{userId}', 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);

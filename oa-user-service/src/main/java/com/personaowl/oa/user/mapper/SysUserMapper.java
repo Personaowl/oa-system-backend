@@ -15,7 +15,8 @@ import java.util.List;
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email,
+                   salary, salary_grade, performance_salary, deduction_salary, status, deleted
             FROM sys_user
             WHERE username = #{username} AND status = 1 AND deleted = 0
             LIMIT 1
@@ -29,7 +30,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     long countByUsernameExcluding(@Param("username") String username, @Param("excludeId") Long excludeId);
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email,
+                   salary, salary_grade, performance_salary, deduction_salary, status, deleted
             FROM sys_user
             WHERE id = #{userId} AND status = 1 AND deleted = 0
             LIMIT 1
@@ -37,7 +39,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
     SysUser findEnabledById(@Param("userId") Long userId);
 
     @Select("""
-            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email,
+                   salary, salary_grade, performance_salary, deduction_salary, status, deleted
             FROM sys_user
             WHERE id = #{userId} AND deleted = 0
             LIMIT 1
@@ -74,7 +77,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
             <script>
-            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email,
+                   salary, salary_grade, performance_salary, deduction_salary, status, deleted
             FROM sys_user
             WHERE deleted = 0
             <if test='keyword != null and keyword != ""'>
@@ -93,7 +97,8 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Select("""
             <script>
-            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email, salary, status, deleted
+            SELECT id, department_id, username, password_hash, display_name, avatar_file_name, phone, email,
+                   salary, salary_grade, performance_salary, deduction_salary, status, deleted
             FROM sys_user
             WHERE deleted = 0
             <if test='keyword != null and keyword != ""'>
@@ -134,4 +139,19 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @Update("UPDATE sys_user SET salary = #{salary}, updated_at = CURRENT_TIMESTAMP WHERE id = #{userId} AND deleted = 0")
     int updateSalary(@Param("userId") Long userId, @Param("salary") java.math.BigDecimal salary);
+
+    @Update("""
+            UPDATE sys_user
+            SET salary_grade = #{salaryGrade},
+                salary = #{baseSalary},
+                performance_salary = #{performanceSalary},
+                deduction_salary = #{deductionSalary},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{userId} AND deleted = 0
+            """)
+    int updateSalaryDetail(@Param("userId") Long userId,
+                           @Param("salaryGrade") String salaryGrade,
+                           @Param("baseSalary") java.math.BigDecimal baseSalary,
+                           @Param("performanceSalary") java.math.BigDecimal performanceSalary,
+                           @Param("deductionSalary") java.math.BigDecimal deductionSalary);
 }
