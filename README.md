@@ -13,6 +13,7 @@ Spring Boot 3.5 / Spring Cloud Alibaba microservice backend for the JavaEE cours
 | `oa-notice-service` | 8104 | Notices and read state |
 | `oa-ai-service` | 8105 | Spring AI, Ollama and Redis vector search |
 | `oa-document-service` | 8106 | Department workspaces and shared rich-text documents |
+| `oa-asset-service` | 8107 | Office supply requests and fixed asset lifecycle |
 
 Shared libraries are under `oa-common`. Business modules may depend on common modules; common modules must never depend on business modules.
 

@@ -46,6 +46,10 @@ spring:
               uri: lb://oa-document-service
               predicates:
                 - Path=/api/v1/documents/**,/api/v1/document-workspaces/**
+            - id: oa-asset-service
+              uri: lb://oa-asset-service
+              predicates:
+                - Path=/api/v1/assets/**
 
 oa:
   security:

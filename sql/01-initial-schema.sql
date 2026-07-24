@@ -227,3 +227,68 @@ CREATE TABLE IF NOT EXISTS shared_document (
     KEY idx_shared_document_department_updated (department_id, updated_at),
     KEY idx_shared_document_updated_by (updated_by)
 ) COMMENT='部门共享文档';
+
+CREATE TABLE IF NOT EXISTS office_supply (
+    id BIGINT PRIMARY KEY COMMENT '办公用品主键',
+    name VARCHAR(100) NOT NULL COMMENT '用品名称',
+    category VARCHAR(64) NOT NULL COMMENT '用品分类',
+    unit VARCHAR(32) NOT NULL COMMENT '计量单位',
+    stock_quantity INT NOT NULL DEFAULT 0 COMMENT '当前库存',
+    safety_stock INT NOT NULL DEFAULT 0 COMMENT '安全库存',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：1启用，0停用',
+    created_by BIGINT NULL COMMENT '创建人ID',
+    updated_by BIGINT NULL COMMENT '更新人ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+    UNIQUE KEY uk_office_supply_category_name (category, name),
+    KEY idx_office_supply_status_stock (status, stock_quantity)
+) COMMENT='办公用品库存';
+
+CREATE TABLE IF NOT EXISTS office_supply_request (
+    id BIGINT PRIMARY KEY COMMENT '办公用品申领主键',
+    request_no VARCHAR(64) NOT NULL COMMENT '申领单号',
+    applicant_id BIGINT NOT NULL COMMENT '申请人ID',
+    department_id BIGINT NOT NULL COMMENT '申请人部门ID',
+    supply_id BIGINT NOT NULL COMMENT '用品ID',
+    quantity INT NOT NULL COMMENT '申请数量',
+    reason VARCHAR(500) NOT NULL COMMENT '申请原因',
+    status VARCHAR(32) NOT NULL COMMENT 'PENDING/APPROVED/REJECTED/ISSUED/CANCELLED',
+    reviewer_id BIGINT NULL COMMENT '审批人ID',
+    review_comment VARCHAR(500) NULL COMMENT '审批意见',
+    reviewed_at DATETIME NULL COMMENT '审批时间',
+    issued_by BIGINT NULL COMMENT '发放人ID',
+    issued_at DATETIME NULL COMMENT '发放时间',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+    UNIQUE KEY uk_supply_request_no (request_no),
+    KEY idx_supply_request_applicant (applicant_id, created_at),
+    KEY idx_supply_request_department_status (department_id, status, created_at)
+) COMMENT='办公用品申领单';
+
+CREATE TABLE IF NOT EXISTS fixed_asset (
+    id BIGINT PRIMARY KEY COMMENT '固定资产主键',
+    asset_code VARCHAR(64) NOT NULL COMMENT '资产编号',
+    name VARCHAR(100) NOT NULL COMMENT '资产名称',
+    category VARCHAR(64) NOT NULL COMMENT '资产分类',
+    specification VARCHAR(255) NULL COMMENT '品牌型号或规格',
+    purchase_date DATE NULL COMMENT '购置日期',
+    original_value DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT '资产原值',
+    status VARCHAR(32) NOT NULL DEFAULT 'IDLE' COMMENT 'IDLE/IN_USE/REPAIR/SCRAPPED',
+    custodian_id BIGINT NULL COMMENT '当前保管人ID',
+    department_id BIGINT NULL COMMENT '当前使用部门ID',
+    location VARCHAR(128) NULL COMMENT '存放地点',
+    remark VARCHAR(500) NULL COMMENT '备注',
+    created_by BIGINT NULL COMMENT '创建人ID',
+    updated_by BIGINT NULL COMMENT '更新人ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    version INT NOT NULL DEFAULT 0 COMMENT '乐观锁版本号',
+    deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+    UNIQUE KEY uk_fixed_asset_code (asset_code),
+    KEY idx_fixed_asset_department_status (department_id, status),
+    KEY idx_fixed_asset_custodian (custodian_id, status)
+) COMMENT='固定资产台账';

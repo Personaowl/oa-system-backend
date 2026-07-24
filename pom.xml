@@ -27,6 +27,7 @@
         <module>oa-notice-service</module>
         <module>oa-ai-service</module>
         <module>oa-document-service</module>
+        <module>oa-asset-service</module>
     </modules>
 
     <properties>
