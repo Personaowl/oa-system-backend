@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS attendance_record (
     work_date DATE NOT NULL COMMENT '工作日期',
     check_in_time DATETIME NULL COMMENT '上班打卡时间',
     check_out_time DATETIME NULL COMMENT '下班打卡时间',
+    actual_work_minutes INT NOT NULL DEFAULT 0 COMMENT '实际工时分钟数',
     status VARCHAR(32) NOT NULL COMMENT '考勤状态',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

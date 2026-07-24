@@ -289,12 +289,14 @@ public class AttendanceApplicationService {
                 || (record.getStatus() != null && record.getStatus().indicatesLate());
         CheckResult result = ruleCalculator.resolveCheckOut(
                 checkOutTime, wasLate, ruleSnapshotFor(record));
+        int actualWorkMinutes = calculateActualWorkMinutes(record.getCheckInTime(), checkOutTime);
         int version = record.getVersion() == null ? 0 : record.getVersion();
         int updated = recordMapper.completeCheckOut(
                 record.getId(),
                 checkOutTime,
                 result.status(),
                 result.earlyLeaveMinutes(),
+                actualWorkMinutes,
                 version);
         if (updated != 1) {
             AttendanceRecordEntity latest = recordMapper.selectById(record.getId());
@@ -309,7 +311,8 @@ public class AttendanceApplicationService {
                 atOffset(checkOutTime),
                 result.status(),
                 result.earlyLeave(),
-                result.earlyLeaveMinutes());
+                result.earlyLeaveMinutes(),
+                actualWorkMinutes);
     }
 
     private RuleSnapshot ruleSnapshotFor(AttendanceRecordEntity record) {
@@ -399,7 +402,8 @@ public class AttendanceApplicationService {
                 atOffset(record.getCheckOutTime()),
                 status,
                 record.getLateMinutes(),
-                record.getEarlyLeaveMinutes());
+                record.getEarlyLeaveMinutes(),
+                record.getActualWorkMinutes());
     }
 
     private TodayStatusResponse toTodayStatus(AttendanceRecordEntity record, boolean historicalOpenRecord) {
@@ -410,7 +414,8 @@ public class AttendanceApplicationService {
                     null,
                     AttendanceStatus.MISSING_CHECK_OUT,
                     true,
-                    false);
+                    false,
+                    0);
         }
 
         boolean canCheckIn = record.getCheckInTime() == null
@@ -425,7 +430,13 @@ public class AttendanceApplicationService {
                 atOffset(record.getCheckOutTime()),
                 record.getStatus(),
                 canCheckIn,
-                canCheckOut);
+                canCheckOut,
+                record.getActualWorkMinutes());
+    }
+
+    private int calculateActualWorkMinutes(LocalDateTime checkInTime, LocalDateTime checkOutTime) {
+        if (checkInTime == null || checkOutTime == null || checkOutTime.isBefore(checkInTime)) return 0;
+        return Math.toIntExact(ChronoUnit.MINUTES.between(checkInTime, checkOutTime));
     }
 
     private OffsetDateTime atOffset(LocalDateTime dateTime) {

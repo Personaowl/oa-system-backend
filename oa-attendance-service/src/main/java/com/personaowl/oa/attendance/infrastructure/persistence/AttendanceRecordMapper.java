@@ -20,6 +20,7 @@ public interface AttendanceRecordMapper extends BaseMapper<AttendanceRecordEntit
             SET check_out_time = #{checkOutTime},
                 status = #{status},
                 early_leave_minutes = #{earlyLeaveMinutes},
+                actual_work_minutes = #{actualWorkMinutes},
                 updated_at = #{checkOutTime},
                 version = version + 1
             WHERE id = #{id}
@@ -30,6 +31,7 @@ public interface AttendanceRecordMapper extends BaseMapper<AttendanceRecordEntit
                          @Param("checkOutTime") LocalDateTime checkOutTime,
                          @Param("status") AttendanceStatus status,
                          @Param("earlyLeaveMinutes") int earlyLeaveMinutes,
+                         @Param("actualWorkMinutes") int actualWorkMinutes,
                          @Param("version") int version);
 
     @Update("""

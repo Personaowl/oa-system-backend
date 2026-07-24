@@ -200,6 +200,7 @@ public class AttendanceCorrectionService {
             record.setStatus(AttendanceStatus.MISSING_CHECK_IN);
             record.setLateMinutes(0);
             record.setEarlyLeaveMinutes(0);
+            record.setActualWorkMinutes(0);
             return;
         }
         CheckResult checkIn = ruleCalculator.resolveCheckIn(record.getCheckInTime(), snapshot);
@@ -207,6 +208,7 @@ public class AttendanceCorrectionService {
         if (record.getCheckOutTime() == null) {
             record.setStatus(AttendanceStatus.MISSING_CHECK_OUT);
             record.setEarlyLeaveMinutes(0);
+            record.setActualWorkMinutes(0);
             return;
         }
         if (record.getCheckOutTime().isBefore(record.getCheckInTime())) {
@@ -216,6 +218,8 @@ public class AttendanceCorrectionService {
                 record.getCheckOutTime(), checkIn.late(), snapshot);
         record.setStatus(result.status());
         record.setEarlyLeaveMinutes(result.earlyLeaveMinutes());
+        record.setActualWorkMinutes(Math.toIntExact(
+                ChronoUnit.MINUTES.between(record.getCheckInTime(), record.getCheckOutTime())));
     }
 
     private RuleSnapshot snapshotFor(AttendanceRecordEntity record) {

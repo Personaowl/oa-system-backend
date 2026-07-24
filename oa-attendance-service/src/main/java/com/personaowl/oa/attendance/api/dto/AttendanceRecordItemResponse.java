@@ -17,8 +17,18 @@ public record AttendanceRecordItemResponse(
         OffsetDateTime checkOutTime,
         AttendanceStatus status,
         int lateMinutes,
-        int earlyLeaveMinutes
+        int earlyLeaveMinutes,
+        int actualWorkMinutes
 ) {
+    public AttendanceRecordItemResponse(String recordId, String userId, String username,
+                                        String employeeName, String departmentId, String departmentName,
+                                        LocalDate workDate, OffsetDateTime checkInTime,
+                                        OffsetDateTime checkOutTime, AttendanceStatus status,
+                                        int lateMinutes, int earlyLeaveMinutes) {
+        this(recordId, userId, username, employeeName, departmentId, departmentName,
+                workDate, checkInTime, checkOutTime, status, lateMinutes, earlyLeaveMinutes, 0);
+    }
+
     public AttendanceRecordItemResponse(String recordId,
                                         String userId,
                                         LocalDate workDate,
@@ -28,6 +38,6 @@ public record AttendanceRecordItemResponse(
                                         int lateMinutes,
                                         int earlyLeaveMinutes) {
         this(recordId, userId, null, null, null, null, workDate,
-                checkInTime, checkOutTime, status, lateMinutes, earlyLeaveMinutes);
+                checkInTime, checkOutTime, status, lateMinutes, earlyLeaveMinutes, 0);
     }
 }

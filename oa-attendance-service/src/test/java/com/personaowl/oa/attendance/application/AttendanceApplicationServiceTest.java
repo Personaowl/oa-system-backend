@@ -235,6 +235,7 @@ class AttendanceApplicationServiceTest {
                 LocalDateTime.of(2026, 7, 21, 18, 0),
                 AttendanceStatus.NORMAL,
                 0,
+                537,
                 0)).thenReturn(1);
 
         CheckOutResponse response = service.checkOut(OPERATOR);
@@ -244,6 +245,7 @@ class AttendanceApplicationServiceTest {
         assertEquals(AttendanceStatus.NORMAL, response.status());
         assertFalse(response.earlyLeave());
         assertEquals(0, response.earlyLeaveMinutes());
+        assertEquals(537, response.actualWorkMinutes());
         verify(lockService).release(lock);
     }
 
@@ -266,6 +268,7 @@ class AttendanceApplicationServiceTest {
                 LocalDateTime.of(2026, 7, 21, 17, 30),
                 AttendanceStatus.LATE_AND_EARLY_LEAVE,
                 30,
+                500,
                 0)).thenReturn(1);
 
         CheckOutResponse response = service.checkOut(OPERATOR);
@@ -273,6 +276,7 @@ class AttendanceApplicationServiceTest {
         assertEquals(AttendanceStatus.LATE_AND_EARLY_LEAVE, response.status());
         assertTrue(response.earlyLeave());
         assertEquals(30, response.earlyLeaveMinutes());
+        assertEquals(500, response.actualWorkMinutes());
     }
 
     @Test
@@ -285,7 +289,7 @@ class AttendanceApplicationServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> service.checkOut(OPERATOR));
 
         assertEquals(ErrorCode.ATTENDANCE_CHECK_IN_REQUIRED, exception.errorCode());
-        verify(recordMapper, never()).completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt());
+        verify(recordMapper, never()).completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt(), anyInt());
         verify(lockService).release(lock);
     }
 
@@ -304,7 +308,7 @@ class AttendanceApplicationServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> service.checkOut(OPERATOR));
 
         assertEquals(ErrorCode.ATTENDANCE_ALREADY_CHECKED_OUT, exception.errorCode());
-        verify(recordMapper, never()).completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt());
+        verify(recordMapper, never()).completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt(), anyInt());
     }
 
     @Test
@@ -323,7 +327,7 @@ class AttendanceApplicationServiceTest {
                 AttendanceStatus.NORMAL);
         when(lockService.acquire(any(Long.class), any(LocalDate.class))).thenReturn(lock);
         when(recordMapper.selectOne(any(Wrapper.class))).thenReturn(record);
-        when(recordMapper.completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt()))
+        when(recordMapper.completeCheckOut(anyLong(), any(), any(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(0);
         when(recordMapper.selectById(record.getId())).thenReturn(latest);
 

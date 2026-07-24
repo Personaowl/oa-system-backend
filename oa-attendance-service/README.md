@@ -50,6 +50,7 @@ Existing attendance records retain the rule snapshot captured at check-in time.
 | --- | --- | --- |
 | `POST /api/v1/attendance/check-in` | Check in current employee | Authenticated |
 | `POST /api/v1/attendance/check-out` | Check out current employee | Authenticated |
+| `GET /api/v1/attendance/records/export` | Export filtered attendance records and work duration to Excel | Same scope as record query |
 | `GET /api/v1/attendance/today` | Current employee today status | Authenticated |
 | `GET /api/v1/attendance/records` | Personal or scoped records with employee/department data | Cross-user: `attendance:record:query` |
 | `GET /api/v1/attendance/scope` | Visible departments and employee filter options | Authenticated; server-side data scope |

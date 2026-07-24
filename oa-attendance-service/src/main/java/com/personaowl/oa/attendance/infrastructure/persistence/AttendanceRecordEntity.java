@@ -25,6 +25,7 @@ public class AttendanceRecordEntity {
     private AttendanceStatus status;
     private int lateMinutes;
     private int earlyLeaveMinutes;
+    private int actualWorkMinutes;
     private LocalTime ruleWorkStart;
     private LocalTime ruleWorkEnd;
     private Integer ruleLateThresholdMinutes;
@@ -101,6 +102,14 @@ public class AttendanceRecordEntity {
 
     public void setEarlyLeaveMinutes(int earlyLeaveMinutes) {
         this.earlyLeaveMinutes = earlyLeaveMinutes;
+    }
+
+    public int getActualWorkMinutes() {
+        return actualWorkMinutes;
+    }
+
+    public void setActualWorkMinutes(int actualWorkMinutes) {
+        this.actualWorkMinutes = actualWorkMinutes;
     }
 
     public LocalTime getRuleWorkStart() {

@@ -11,6 +11,12 @@ public record TodayStatusResponse(
         OffsetDateTime checkOutTime,
         AttendanceStatus status,
         boolean canCheckIn,
-        boolean canCheckOut
+        boolean canCheckOut,
+        int actualWorkMinutes
 ) {
+    public TodayStatusResponse(LocalDate workDate, OffsetDateTime checkInTime,
+                               OffsetDateTime checkOutTime, AttendanceStatus status,
+                               boolean canCheckIn, boolean canCheckOut) {
+        this(workDate, checkInTime, checkOutTime, status, canCheckIn, canCheckOut, 0);
+    }
 }

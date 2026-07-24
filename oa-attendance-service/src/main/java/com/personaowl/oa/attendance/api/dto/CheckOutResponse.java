@@ -9,6 +9,12 @@ public record CheckOutResponse(
         OffsetDateTime checkOutTime,
         AttendanceStatus status,
         boolean earlyLeave,
-        int earlyLeaveMinutes
+        int earlyLeaveMinutes,
+        int actualWorkMinutes
 ) {
+    public CheckOutResponse(String recordId, OffsetDateTime checkOutTime,
+                            AttendanceStatus status, boolean earlyLeave,
+                            int earlyLeaveMinutes) {
+        this(recordId, checkOutTime, status, earlyLeave, earlyLeaveMinutes, 0);
+    }
 }
