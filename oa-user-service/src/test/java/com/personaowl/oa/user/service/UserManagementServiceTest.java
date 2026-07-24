@@ -89,13 +89,12 @@ class UserManagementServiceTest {
     @Test
     void managerListIsAutomaticallyScopedToOwnDepartment() {
         SysUser manager = user(10L, "manager");
-        SysDepartment department = department();
-        department.setManagerId(10L);
         when(userMapper.findAvailableById(10L)).thenReturn(manager);
-        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+        when(departmentMapper.countManagedDepartment(10L, 1L)).thenReturn(1L);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department());
         when(userMapper.countAvailable(null, 1L)).thenReturn(0L);
 
-        var response = service.listUsers(10L, "MANAGER", null, null, 1, 20);
+        var response = service.listUsers(10L, "data:scope:department", null, null, 1, 20);
 
         assertThat(response.total()).isZero();
         verify(userMapper).countAvailable(null, 1L);
@@ -104,13 +103,12 @@ class UserManagementServiceTest {
     @Test
     void managerExportIsAutomaticallyScopedToOwnDepartment() {
         SysUser manager = user(10L, "manager");
-        SysDepartment department = department();
-        department.setManagerId(10L);
         when(userMapper.findAvailableById(10L)).thenReturn(manager);
-        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+        when(departmentMapper.countManagedDepartment(10L, 1L)).thenReturn(1L);
+        when(departmentMapper.findAvailableById(1L)).thenReturn(department());
         when(userMapper.findAllAvailable(null, 1L)).thenReturn(List.of());
 
-        var response = service.listUsersForExport(10L, "MANAGER", null, null);
+        var response = service.listUsersForExport(10L, "data:scope:department", null, null);
 
         assertThat(response).isEmpty();
         verify(userMapper).findAllAvailable(null, 1L);
@@ -121,13 +119,11 @@ class UserManagementServiceTest {
         SysUser manager = user(10L, "manager");
         SysUser target = user(20L, "outside");
         target.setDepartmentId(2L);
-        SysDepartment department = department();
-        department.setManagerId(10L);
         when(userMapper.findAvailableById(20L)).thenReturn(target);
         when(userMapper.findAvailableById(10L)).thenReturn(manager);
-        when(departmentMapper.findAvailableById(1L)).thenReturn(department);
+        when(departmentMapper.countManagedDepartment(10L, 1L)).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.updateSalary(10L, "MANAGER", 20L, new BigDecimal("13000.00")))
+        assertThatThrownBy(() -> service.updateSalary(10L, "data:scope:department", 20L, new BigDecimal("13000.00")))
                 .isInstanceOfSatisfying(BusinessException.class,
                         exception -> assertThat(exception.errorCode()).isEqualTo(ErrorCode.FORBIDDEN));
         verify(userMapper, never()).updateSalary(20L, new BigDecimal("13000.00"));
@@ -142,7 +138,7 @@ class UserManagementServiceTest {
         when(userMapper.findRoleIds(20L)).thenReturn(List.of(2L));
         when(userMapper.findRoleCodes(20L)).thenReturn(List.of("EMPLOYEE"));
 
-        var response = service.updateSalary(1L, "ADMIN", 20L, new BigDecimal("13500"));
+        var response = service.updateSalary(1L, "system:admin", 20L, new BigDecimal("13500"));
 
         assertThat(response.salary()).isEqualByComparingTo("13500.00");
         verify(userMapper).updateSalary(20L, new BigDecimal("13500.00"));
@@ -158,7 +154,7 @@ class UserManagementServiceTest {
         when(userMapper.findRoleIds(20L)).thenReturn(List.of(2L));
         when(userMapper.findRoleCodes(20L)).thenReturn(List.of("EMPLOYEE"));
 
-        var response = service.updateSalaryDetail(1L, "ADMIN", 20L,
+        var response = service.updateSalaryDetail(1L, "system:admin", 20L,
                 new SalaryDetailUpdateRequest("18b", new BigDecimal("1800"), new BigDecimal("300")));
 
         assertThat(response.salaryGrade()).isEqualTo("18B");

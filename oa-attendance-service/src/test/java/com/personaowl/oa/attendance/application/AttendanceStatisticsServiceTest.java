@@ -33,7 +33,8 @@ class AttendanceStatisticsServiceTest {
 
     private static final OperatorContext EMPLOYEE = new OperatorContext(10001L, Set.of(), "trace-user");
     private static final OperatorContext ADMIN = new OperatorContext(
-            90001L, Set.of(AttendanceAuthorizationService.STATISTICS_QUERY_PERMISSION), "trace-admin");
+            90001L, Set.of(AttendanceAuthorizationService.STATISTICS_QUERY_PERMISSION,
+            AttendanceAuthorizationService.ALL_DATA_SCOPE_PERMISSION), "trace-admin");
 
     @Mock
     private AttendanceRecordMapper recordMapper;

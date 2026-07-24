@@ -60,9 +60,9 @@ public class UserManagementService {
     }
 
     @Transactional(readOnly = true)
-    public UserPageResponse listUsers(Long operatorId, String roles, String keyword,
+    public UserPageResponse listUsers(Long operatorId, String permissions, String keyword,
                                       Long departmentId, Integer page, Integer size) {
-        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, permissions);
         if (scopedDepartmentId != null && departmentId != null && !scopedDepartmentId.equals(departmentId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能查看本部门员工");
         }
@@ -70,9 +70,9 @@ public class UserManagementService {
     }
 
     @Transactional(readOnly = true)
-    public List<UserResponse> listUsersForExport(Long operatorId, String roles, String keyword,
+    public List<UserResponse> listUsersForExport(Long operatorId, String permissions, String keyword,
                                                  Long departmentId) {
-        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, permissions);
         if (scopedDepartmentId != null && departmentId != null && !scopedDepartmentId.equals(departmentId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能导出本部门员工");
         }
@@ -105,14 +105,14 @@ public class UserManagementService {
     }
 
     @Transactional
-    public UserResponse updateSalary(Long operatorId, String roles, Long userId, BigDecimal salary) {
+    public UserResponse updateSalary(Long operatorId, String permissions, Long userId, BigDecimal salary) {
         if (salary == null || salary.signum() < 0 || salary.scale() > 2
                 || salary.precision() - salary.scale() > 10) {
             throw new BusinessException(ErrorCode.INVALID_ARGUMENT,
                     "薪资必须是0到9999999999.99之间的金额，最多两位小数");
         }
         SysUser target = requireUser(userId);
-        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, permissions);
         if (scopedDepartmentId != null && !scopedDepartmentId.equals(target.getDepartmentId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能调整本部门员工薪资");
         }
@@ -128,10 +128,10 @@ public class UserManagementService {
     }
 
     @Transactional
-    public UserResponse updateSalaryDetail(Long operatorId, String roles, Long userId,
+    public UserResponse updateSalaryDetail(Long operatorId, String permissions, Long userId,
                                            SalaryDetailUpdateRequest request) {
         SysUser target = requireUser(userId);
-        Long scopedDepartmentId = resolveScopedDepartment(operatorId, roles);
+        Long scopedDepartmentId = resolveScopedDepartment(operatorId, permissions);
         if (scopedDepartmentId != null && !scopedDepartmentId.equals(target.getDepartmentId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管只能调整本部门员工薪资");
         }
@@ -295,31 +295,30 @@ public class UserManagementService {
         return status;
     }
 
-    private Long resolveScopedDepartment(Long operatorId, String rolesHeader) {
-        Set<String> roles = parseRoles(rolesHeader);
-        if (roles.contains("ADMIN") || roles.contains("HR")) return null;
-        if (!roles.contains("MANAGER")) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号无权访问员工管理");
+    private Long resolveScopedDepartment(Long operatorId, String permissionsHeader) {
+        Set<String> permissions = parsePermissions(permissionsHeader);
+        if (permissions.contains("SYSTEM:ADMIN") || permissions.contains("DATA:SCOPE:ALL")) return null;
+        if (!permissions.contains("DATA:SCOPE:DEPARTMENT")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前角色未配置员工数据范围");
         }
         SysUser operator = requireUser(operatorId);
         if (operator.getDepartmentId() == null) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "部门主管尚未分配部门");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前用户尚未分配部门");
         }
-        SysDepartment department = departmentMapper.findAvailableById(operator.getDepartmentId());
-        if (department == null || !operatorId.equals(department.getManagerId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号不是所属部门负责人");
+        if (departmentMapper.countManagedDepartment(operatorId, operator.getDepartmentId()) == 0) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前用户不是所属部门负责人");
         }
-        return department.getId();
+        return operator.getDepartmentId();
     }
 
-    private Set<String> parseRoles(String rolesHeader) {
-        if (rolesHeader == null || rolesHeader.isBlank()) return Set.of();
-        Set<String> roles = new LinkedHashSet<>();
-        Arrays.stream(rolesHeader.split(","))
+    private Set<String> parsePermissions(String permissionsHeader) {
+        if (permissionsHeader == null || permissionsHeader.isBlank()) return Set.of();
+        Set<String> permissions = new LinkedHashSet<>();
+        Arrays.stream(permissionsHeader.split("[,;\\s]+"))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .map(value -> value.toUpperCase(Locale.ROOT))
-                .forEach(roles::add);
-        return roles;
+                .forEach(permissions::add);
+        return permissions;
     }
 }

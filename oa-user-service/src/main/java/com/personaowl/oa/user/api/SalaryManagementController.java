@@ -43,7 +43,7 @@ public class SalaryManagementController {
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "sys:salary:view");
         return ApiResponse.success(
-                userService.listUsers(operatorId, roles, keyword, departmentId, page, size), traceId);
+                userService.listUsers(operatorId, permissions, keyword, departmentId, page, size), traceId);
     }
 
     @GetMapping("/grades")
@@ -64,6 +64,6 @@ public class SalaryManagementController {
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "sys:salary:update");
         return ApiResponse.success(
-                userService.updateSalaryDetail(operatorId, roles, userId, request), traceId);
+                userService.updateSalaryDetail(operatorId, permissions, userId, request), traceId);
     }
 }

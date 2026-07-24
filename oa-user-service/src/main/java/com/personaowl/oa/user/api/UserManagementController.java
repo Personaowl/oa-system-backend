@@ -43,7 +43,7 @@ public class UserManagementController {
             @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "sys:user:list");
-        return ApiResponse.success(userService.listUsers(operatorId, roles, keyword, departmentId, page, size), traceId);
+        return ApiResponse.success(userService.listUsers(operatorId, permissions, keyword, departmentId, page, size), traceId);
     }
 
     @PostMapping
@@ -85,6 +85,6 @@ public class UserManagementController {
             @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions,
             @RequestHeader(value = RequestHeaders.TRACE_ID, required = false) String traceId) {
         permissionGuard.require(permissions, "sys:salary:update");
-        return ApiResponse.success(userService.updateSalary(operatorId, roles, id, request.salary()), traceId);
+        return ApiResponse.success(userService.updateSalary(operatorId, permissions, id, request.salary()), traceId);
     }
 }

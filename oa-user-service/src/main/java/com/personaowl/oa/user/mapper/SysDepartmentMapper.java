@@ -140,6 +140,17 @@ public interface SysDepartmentMapper extends BaseMapper<SysDepartment> {
             """)
     List<Long> findManagerIds(@Param("departmentId") Long departmentId);
 
+    @Select("""
+            SELECT COUNT(*)
+            FROM sys_department_manager dm
+            JOIN sys_department d ON d.id = dm.department_id
+            WHERE dm.department_id = #{departmentId}
+              AND dm.user_id = #{userId}
+              AND d.status = 1 AND d.deleted = 0
+            """)
+    long countManagedDepartment(@Param("userId") Long userId,
+                                @Param("departmentId") Long departmentId);
+
     @Delete("DELETE FROM sys_department_manager WHERE department_id = #{departmentId}")
     int deleteDepartmentManagers(@Param("departmentId") Long departmentId);
 

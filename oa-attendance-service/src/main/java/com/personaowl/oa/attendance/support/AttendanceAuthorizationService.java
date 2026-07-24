@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Set;
 
 @Component
 public class AttendanceAuthorizationService {
@@ -16,6 +15,8 @@ public class AttendanceAuthorizationService {
     public static final String STATISTICS_QUERY_PERMISSION = "attendance:statistics:query";
     public static final String RULE_UPDATE_PERMISSION = "attendance:rule:update";
     public static final String SYSTEM_ADMIN_PERMISSION = "system:admin";
+    public static final String ALL_DATA_SCOPE_PERMISSION = "data:scope:all";
+    public static final String DEPARTMENT_DATA_SCOPE_PERMISSION = "data:scope:department";
 
     private final AttendanceScopeMapper scopeMapper;
 
@@ -50,8 +51,11 @@ public class AttendanceAuthorizationService {
     private RecordQueryScope resolveManagementScope(OperatorContext operator,
                                                     Long requestedUserId,
                                                     Long requestedDepartmentId) {
-        if (isAdministrator(operator) || isHr(operator) || !isManager(operator)) {
+        if (hasAllDataScope(operator)) {
             return unrestrictedScope(requestedUserId, requestedDepartmentId);
+        }
+        if (!operator.permissions().contains(DEPARTMENT_DATA_SCOPE_PERMISSION)) {
+            return selfScope(operator, requestedUserId, requestedDepartmentId);
         }
 
         List<Long> managedDepartmentIds = requireScopeMapper()
@@ -101,23 +105,9 @@ public class AttendanceAuthorizationService {
                 operator.userId(), List.of(), "SELF", false, "仅查询当前用户本人记录");
     }
 
-    private boolean isAdministrator(OperatorContext operator) {
+    private boolean hasAllDataScope(OperatorContext operator) {
         return operator.permissions().contains(SYSTEM_ADMIN_PERMISSION)
-                || hasRole(operator.roles(), "ADMIN")
-                || hasRole(operator.roles(), "SUPER_ADMIN");
-    }
-
-    private boolean isHr(OperatorContext operator) {
-        return hasRole(operator.roles(), "HR");
-    }
-
-    private boolean isManager(OperatorContext operator) {
-        return hasRole(operator.roles(), "MANAGER");
-    }
-
-    private boolean hasRole(Set<String> roles, String expected) {
-        return roles.stream().anyMatch(role -> expected.equalsIgnoreCase(role)
-                || ("ROLE_" + expected).equalsIgnoreCase(role));
+                || operator.permissions().contains(ALL_DATA_SCOPE_PERMISSION);
     }
 
     private AttendanceScopeMapper requireScopeMapper() {

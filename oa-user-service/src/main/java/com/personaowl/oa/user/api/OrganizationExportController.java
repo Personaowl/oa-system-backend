@@ -61,7 +61,7 @@ public class OrganizationExportController {
             @RequestHeader(value = RequestHeaders.ROLES, required = false) String roles,
             @RequestHeader(value = RequestHeaders.PERMISSIONS, required = false) String permissions) {
         permissionGuard.require(permissions, "sys:user:list");
-        List<UserResponse> users = userService.listUsersForExport(operatorId, roles, keyword, departmentId);
+        List<UserResponse> users = userService.listUsersForExport(operatorId, permissions, keyword, departmentId);
         boolean includeSalary = hasPermission(permissions, "sys:salary:view");
         return excelResponse(excelExportService.exportUsers(users, includeSalary),
                 "employees.xlsx", "员工数据_" + FILE_TIME.format(LocalDateTime.now()) + ".xlsx");

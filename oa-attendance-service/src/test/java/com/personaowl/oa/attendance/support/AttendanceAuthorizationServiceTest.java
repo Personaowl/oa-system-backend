@@ -58,7 +58,8 @@ class AttendanceAuthorizationServiceTest {
     @Test
     void allowsAuthorizedAdministratorToQueryAllOrSpecificUser() {
         OperatorContext operator = new OperatorContext(
-                90001L, Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION), "trace-admin");
+                90001L, Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION,
+                AttendanceAuthorizationService.ALL_DATA_SCOPE_PERMISSION), "trace-admin");
 
         RecordQueryScope allUsers = service.resolveRecordQueryScope(operator, null, null);
         RecordQueryScope specificUser = service.resolveRecordQueryScope(operator, 10002L, null);
@@ -72,7 +73,8 @@ class AttendanceAuthorizationServiceTest {
     @Test
     void appliesAuthorizedDepartmentFilter() {
         OperatorContext operator = new OperatorContext(
-                90001L, Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION), "trace-admin");
+                90001L, Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION,
+                AttendanceAuthorizationService.ALL_DATA_SCOPE_PERMISSION), "trace-admin");
 
         RecordQueryScope scope = service.resolveRecordQueryScope(operator, null, 10L);
 
@@ -88,8 +90,9 @@ class AttendanceAuthorizationServiceTest {
         AttendanceAuthorizationService scopedService = new AttendanceAuthorizationService(mapper);
         OperatorContext manager = new OperatorContext(
                 20001L,
-                Set.of("MANAGER"),
-                Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION),
+                Set.of("CUSTOM_MANAGER"),
+                Set.of(AttendanceAuthorizationService.RECORD_QUERY_PERMISSION,
+                        AttendanceAuthorizationService.DEPARTMENT_DATA_SCOPE_PERMISSION),
                 "trace-manager");
         when(mapper.findManagedDepartmentIds(20001L)).thenReturn(List.of(10L));
 

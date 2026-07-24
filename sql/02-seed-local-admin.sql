@@ -110,7 +110,10 @@ VALUES
     (34, 0, 'attendance:rule:update', '修改考勤规则', 'API', '/api/v1/attendance/rules/current', 0),
     (35, 0, 'flow:task:approve', '处理审批任务', 'BUTTON', NULL, 0),
     (36, 0, 'sys:salary:view', '查看薪资管理', 'API', '/api/v1/salaries', 0),
-    (37, 0, 'sys:salary:update', '维护员工薪资', 'API', '/api/v1/salaries/{userId}', 0)
+    (37, 0, 'sys:salary:update', '维护员工薪资', 'API', '/api/v1/salaries/{userId}', 0),
+    (38, 0, 'data:scope:all', '全部数据范围', 'DATA', NULL, 0),
+    (39, 0, 'data:scope:department', '本部门数据范围', 'DATA', NULL, 0),
+    (40, 0, 'data:scope:self', '仅本人数据范围', 'DATA', NULL, 0)
 ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), deleted = 0;
 
 INSERT IGNORE INTO sys_user_role (user_id, role_id) VALUES (1, 1);
@@ -123,7 +126,7 @@ WHERE deleted = 0;
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 2, id
 FROM sys_permission
-WHERE code IN ('attendance:read', 'flow:read', 'notice:read', 'ai:chat');
+WHERE code IN ('attendance:read', 'flow:read', 'notice:read', 'ai:chat', 'data:scope:self');
 
 -- HR can view the organization structure and maintain employee records, but department
 -- structure changes remain an administrator responsibility (separation of duties).
@@ -146,7 +149,7 @@ WHERE code IN (
     'sys:user:list', 'sys:user:create', 'sys:user:update', 'sys:user:delete',
     'sys:salary:view', 'sys:salary:update',
     'sys:user:role:list', 'sys:user:assign-role', 'ai:chat',
-    'attendance:record:query', 'attendance:statistics:query'
+    'attendance:record:query', 'attendance:statistics:query', 'data:scope:all'
 );
 
 -- Department managers can query attendance only for departments where they are configured as manager_id.
@@ -156,7 +159,8 @@ FROM sys_permission
 WHERE code IN (
     'user:read', 'attendance:read', 'flow:read', 'notice:read', 'ai:chat',
     'attendance:record:query', 'attendance:statistics:query',
-    'flow:task:approve', 'sys:user:list', 'sys:salary:view', 'sys:salary:update'
+    'flow:task:approve', 'sys:user:list', 'sys:salary:view', 'sys:salary:update',
+    'data:scope:department'
 );
 
 -- Backfill accounts created before default role assignment was introduced.

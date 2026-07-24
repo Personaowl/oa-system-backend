@@ -49,7 +49,7 @@ class OrganizationExportControllerTest {
 
     @Test
     void employeeExportIncludesSalaryOnlyWithSalaryPermission() throws Exception {
-        when(userService.listUsersForExport(10L, "MANAGER", null, null)).thenReturn(List.of());
+        when(userService.listUsersForExport(10L, "sys:user:list", null, null)).thenReturn(List.of());
         when(excelExportService.exportUsers(anyList(), org.mockito.ArgumentMatchers.eq(false))).thenReturn(new byte[]{1});
 
         mockMvc.perform(get("/api/v1/users/export")
